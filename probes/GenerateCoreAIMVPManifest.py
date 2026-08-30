@@ -34,12 +34,8 @@ def main() -> None:
     manifest = {
         "format_version": 1,
         "region": "matmul_matmul_f32_2x3x4x2",
-        "compiler_runtime_operation": (
-            "AsyncRT_CoreAI_enqueueMatmulMatmulF32_2x3x4x2"
-        ),
-        "swift_execution_symbol": (
-            "MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2"
-        ),
+        "producer": "direct-coreai-authoring-probe",
+        "mojo_backend": "not-implemented",
         "runtime_resource": asset.name,
         "minimum_os": "iOS/iPadOS 27.0",
         "placement_contract": "submitted-to-coreai-neural-engine-preferred",

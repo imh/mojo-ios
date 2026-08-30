@@ -1,50 +1,72 @@
 import Darwin
+import CoreAI
 import Foundation
 import UIKit
 
-@_silgen_name("mojo_ios_coreai_matmul_matmul_f32")
-private func mojoIOSCoreAIMatmulMatmul(
-  _ input: UnsafeMutablePointer<Float>,
-  _ firstWeights: UnsafeMutablePointer<Float>,
-  _ secondWeights: UnsafeMutablePointer<Float>,
-  _ output: UnsafeMutablePointer<Float>
-) -> Int32
+@available(iOS 27.0, *)
+private actor CoreAIProbeModelCache {
+  static let shared = CoreAIProbeModelCache()
+  private var model: AIModel?
 
-private enum CoreAIMojoSmoke {
-  static func evaluate() -> [Float] {
-    var input: [Float] = [1, 2, 3, 4, 5, 6]
-    var firstWeights: [Float] = [
+  func loadFunctionForRequest() async throws -> InferenceFunction {
+    let loadedModel: AIModel
+    if let model {
+      loadedModel = model
+    } else {
+      guard let assetURL = Bundle.main.url(
+        forResource: "CoreAIMatmulMatmulF32", withExtension: "aimodel"
+      ) else {
+        preconditionFailure("missing direct Core AI probe resource")
+      }
+      let options = SpecializationOptions(
+        preferredComputeUnitKind: .neuralEngine
+      )
+      let newModel = try await AIModel(contentsOf: assetURL, options: options)
+      model = newModel
+      loadedModel = newModel
+    }
+    guard let function = try loadedModel.loadFunction(named: "main") else {
+      preconditionFailure("direct Core AI probe has no main function")
+    }
+    return function
+  }
+}
+
+@available(iOS 27.0, *)
+private enum CoreAIProbeSmoke {
+  static func evaluate() async throws -> [Float] {
+    let input: [Float] = [1, 2, 3, 4, 5, 6]
+    let firstWeights: [Float] = [
       1, 0, 0, 1,
       0, 1, 1, 0,
       1, 1, 0, 0,
     ]
-    var secondWeights: [Float] = [
+    let secondWeights: [Float] = [
       1, 0,
       0, 1,
       1, 0,
       0, 1,
     ]
-    var output = [Float](repeating: .nan, count: 4)
-    let status = input.withUnsafeMutableBufferPointer { inputBuffer in
-      firstWeights.withUnsafeMutableBufferPointer { firstBuffer in
-        secondWeights.withUnsafeMutableBufferPointer { secondBuffer in
-          output.withUnsafeMutableBufferPointer { outputBuffer in
-            mojoIOSCoreAIMatmulMatmul(
-              inputBuffer.baseAddress!,
-              firstBuffer.baseAddress!,
-              secondBuffer.baseAddress!,
-              outputBuffer.baseAddress!
-            )
-          }
-        }
-      }
+    let function = try await CoreAIProbeModelCache.shared.loadFunctionForRequest()
+    var outputs = try await function.run(inputs: [
+      "input_values": NDArray(scalars: input, shape: [2, 3]),
+      "first_weights": NDArray(scalars: firstWeights, shape: [3, 4]),
+      "second_weights": NDArray(scalars: secondWeights, shape: [4, 2]),
+    ])
+    guard let outputValue = outputs.remove("result"),
+          let output = outputValue.ndArray else {
+      preconditionFailure("direct Core AI probe did not return result NDArray")
     }
-    precondition(status == 0, "Mojo Core AI call failed with status \(status)")
-    precondition(
-      output == [6, 6, 15, 15],
-      "Core AI output \(output); expected [6, 6, 15, 15]"
-    )
-    return output
+    return output.view(as: Float.self).withUnsafePointer {
+      pointer, shape, strides in
+      precondition(shape.count == 2)
+      precondition(shape[0] == 2)
+      precondition(shape[1] == 2)
+      precondition(strides.count == 2)
+      precondition(strides[0] == 2)
+      precondition(strides[1] == 1)
+      return Array(UnsafeBufferPointer(start: pointer, count: 4))
+    }
   }
 }
 
@@ -91,15 +113,18 @@ final class CoreAIDeviceSmokeSceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     Task {
       for _ in 0..<3 {
-        _ = await Task.detached { CoreAIMojoSmoke.evaluate() }.value
+        let output = try! await CoreAIProbeSmoke.evaluate()
+        precondition(output == [6, 6, 15, 15])
       }
       for _ in 0..<10 {
-        await withCheckedContinuation { continuation in
-          DispatchQueue.global(qos: .userInitiated).async {
-            DispatchQueue.concurrentPerform(iterations: 8) { _ in
-              precondition(CoreAIMojoSmoke.evaluate() == [6, 6, 15, 15])
+        try! await withThrowingTaskGroup(of: [Float].self) { taskGroup in
+          for _ in 0..<8 {
+            taskGroup.addTask {
+              try await CoreAIProbeSmoke.evaluate()
             }
-            continuation.resume()
+          }
+          for try await output in taskGroup {
+            precondition(output == [6, 6, 15, 15])
           }
         }
       }
@@ -110,9 +135,9 @@ final class CoreAIDeviceSmokeSceneDelegate: UIResponder, UIWindowSceneDelegate {
       }
       let passMarker =
         "MOJO_IOS_COREAI_DEVICE_SMOKE_PASS "
-        + "source=standard-mojo graph=matmul-matmul "
+        + "source=direct-swift-probe graph=matmul-matmul "
         + "calls=sequential-concurrent concurrent_rounds=10 "
-        + "fallback=none ane=preferred "
+        + "mojo_backend=not-implemented fallback=none ane=preferred "
         + "execution_nonce=\(executionNonce)\n"
       let resultURL = FileManager.default.urls(
         for: .documentDirectory,

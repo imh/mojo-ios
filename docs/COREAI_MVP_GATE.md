@@ -1,103 +1,83 @@
-# Standard-Mojo Core AI MVP gate
+# Standard MAX Core AI backend gate
 
-## Supported preview slice
+## Current verdict
 
-This gate proves one deliberately fixed vertical slice:
+The backend is **not implemented**. This is an intentional architectural gate,
+not an invitation to add an iOS-facing Mojo API or fixed compiler pattern.
+
+The standard source spelling remains the intended contract:
 
 ```text
-ordinary linalg.matmul[target="coreai"] calls
-  -> backend-neutral semantic markers
-  -> generic Core AI region formation
-  -> fixed AsyncRT region submission
-  -> public Swift Core AI runtime
-  -> packaged .aimodel resource
+ordinary MAX tensor operations selected for target="coreai"
+  -> standard MAX graph IR
+  -> registered Core AI graph-backend conversion
+  -> versioned AOT model resource
+  -> normal runtime graph submission
 ```
 
-The source fixture uses `TileTensor`, `row_major`, `linalg.matmul`,
-`DeviceContext(api="coreai")`, and `synchronize()`. It contains no Apple import,
-iOS branch, graph-builder API, project accelerator wrapper, or fallback.
+The open-source repository contains the standard MAX graph-building API, but
+the graph compiler and device driver are supplied by the closed `max._core`
+module. It currently knows CPU, GPU, and NPU devices and exposes no open-source
+backend registration point through which this project can add Core AI.
 
-The current region is exactly two connected, fixed-shape, contiguous Float32
-matmuls: `[2,3] x [3,4]`, followed by `[2,4] x [4,2]`. It is a preview MVP,
-not a general tensor-graph support claim.
+Consequently, `linalg.matmul[target="coreai"]` fails during compilation with a
+named not-implemented diagnostic. `coreai` is not classified as a programmable
+accelerator or a valid kernel target, so standard operations cannot accidentally
+take GPU lowering. Dynamic `DeviceRef.CoreAI().to_device()` likewise fails by
+name instead of aliasing another device.
 
-## Compiler and runtime invariants
+## Prohibited shortcuts
 
-- `coreai` is a distinct valid accelerator target, not an alias for `gpu` or
-  `npu`.
-- Region formation is target-independent compiler machinery and runs at O0 and
-  O3 for iOS device and Simulator object generation.
-- The semantic markers must be completely consumed. Generated objects must
-  import the fixed Core AI AsyncRT operation and contain no Metal, AIR, or
-  residual marker symbol.
-- A disconnected single operation and an unsupported shape fail compilation
-  with a `Core AI region formation:` diagnostic.
-- The logical Core AI context orders submissions, propagates errors, and owns
-  host staging buffers. Raw kernels, device functions, launch dimensions,
-  threadgroup memory, and other programmable-device operations fail by name.
-- No CPU or Metal implementation is used when Core AI submission is unavailable
-  or fails.
+The gate rejects all of the following:
 
-## Artifact and Swift bridge
+- an iOS-only Mojo import, graph builder, wrapper, or operation;
+- fixed semantic marker calls recovered later from LLVM IR;
+- an LLVM pass matching one source program or one exact graph;
+- a project-specific fixed graph function in AsyncRT or the public C ABI;
+- packaging a hand-authored model as if it came from Mojo compilation;
+- CPU, Metal, NPU, or serial fallback.
 
-`build-coreai-mvp-resources` directly authors the matching two-operation graph,
-verifies its IR, compiles eight iOS 27 specializations with Neural Engine
-preferred, executes exact host numerical comparison, and writes deterministic
-resource hashes and toolchain provenance.
+The earlier fixed two-matmul marker/pass/runtime route has been removed. The
+target contract gate scans for its compiler and ABI names so it cannot return
+silently.
 
-The Swift package preserves `CoreAIMatmulMatmulF32.aimodel` as a directory
-resource. Its device build uses only the public `CoreAI` API, caches the loaded
-function, constructs typed NDArrays, submits asynchronously, and completes the
-AsyncRT request. The Simulator SDK has no Core AI module, so that slice builds
-an explicit unavailable error path; it never computes the result elsewhere.
+## Required upstream extension
 
-The unsigned iOS 27 smoke app links the static Mojo library, the Swift bridge,
-and the resource. On supported hardware it checks exact `[6, 6, 15, 15]`
-results across sequential and simultaneous calls.
+Implementation resumes only after the normal MAX path exposes enough of its
+graph compiler and runtime driver to add a backend. The minimum extension must
+support:
 
-## Commands
+1. registering a distinct managed-graph target named `coreai`;
+2. receiving typed graph operations before their semantics are erased;
+3. operation-by-operation conversion with named unsupported diagnostics;
+4. emitting and associating immutable AOT resources with compiled regions;
+5. submitting regions through the normal device/runtime ownership and async
+   completion contracts; and
+6. composing explicitly with CPU and Metal without implicit fallback.
+
+This should be proposed upstream as a generic backend extension, not as Apple
+logic embedded in common graph passes. Once available, Core AI fills in that
+extension exactly as other targets do.
+
+## Present gates
 
 ```sh
 pixi run test-coreai-target-contract
 pixi run test-asyncrt-host
-
-MOJO_IOS_COREAI_DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-  pixi run build-coreai-mvp-resources
-
-pixi run build-source-core
-
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-  pixi run build-swift-smoke
-
-MOJO_IOS_COREAI_DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-  pixi run build-coreai-device-smoke
 ```
 
-Physical execution additionally requires an iOS/iPadOS 27 device, development
-team, and CoreDevice identifier. `test-coreai-device` passes on the connected
-M1 iPad Pro (`iPad13,9`) running iPadOS 27 beta 7 (`24A5424a`). It verifies
-three sequential calls followed by ten rounds of eight simultaneous calls from
-GCD-owned Swift threads, exact `[6, 6, 15, 15]` results, process exit status,
-and a nonce-bound result copied back from the app data container. The bridge
-caches the lightweight `AIModel` but loads a distinct `InferenceFunction` per
-request; sharing one function instance produced intermittent zero outputs in
-the beta runtime.
+These prove distinct target recognition, compile-time rejection through the
+standard operation, absence of removed fixed ABIs, and truthful behavior of the
+minimal logical context. They do not prove graph execution.
 
-The exported Mojo entry point is synchronous. Blocking enough
-`Task.detached` callers can exhaust Swift's cooperative executor while the
-Core AI bridge still needs that executor for async completion. The physical
-concurrency gate therefore uses GCD-owned threads. A generated async Swift
-adapter that suspends instead of blocking remains a separate integration gap;
-the runtime must not disguise it with serial or CPU fallback.
+The separate Apple feasibility commands in
+[COREAI_FEASIBILITY_GATE.md](COREAI_FEASIBILITY_GATE.md) prove that public Core
+AI authoring, AOT compilation, and physical-device execution are viable. Their
+artifacts live under `build/` and are not Swift-package resources.
 
-## Completion boundary
+## Completion criterion
 
-The compiler, runtime, AOT resource, Swift package, signed device app, and
-physical iPad execution portions of this fixed MVP are implemented. Instruments
-placement evidence remains a separate observational gate.
-
-General Core AI support remains incremental: each new operation, shape policy,
-dtype, layout, mutation/effect form, and graph composition rule needs an
-explicit semantic lowering and named negative tests. Apple still owns actual
-CPU/GPU/ANE placement; this project claims only submission to Core AI with the
-Neural Engine preferred.
+This gate passes only when unchanged standard Mojo/MAX tensor source lowers
+through a standard MAX backend extension, packages its generated AOT resource,
+executes from Swift on a physical iPad, and rejects each unsupported semantic
+case explicitly. Until then, the correct result is `NotImplemented`.

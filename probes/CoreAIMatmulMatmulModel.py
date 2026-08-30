@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Author the fixed-shape AOT model consumed by the standard-Mojo MVP."""
+"""Author the fixed-shape AOT model used only by the direct Apple probe."""
 
 from argparse import ArgumentParser
 from pathlib import Path

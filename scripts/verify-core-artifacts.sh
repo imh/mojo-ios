@@ -29,10 +29,6 @@ xcrun nm -gU "${device_library}" | grep -q ' _mojo_ios_async_error_status$'
 xcrun nm -gU "${simulator_library}" | grep -q ' _mojo_ios_async_error_status$'
 xcrun nm -gU "${device_library}" | grep -q ' _mojo_ios_print_diagnostic$'
 xcrun nm -gU "${simulator_library}" | grep -q ' _mojo_ios_print_diagnostic$'
-xcrun nm -gU "${device_library}" | \
-  grep -q ' _mojo_ios_coreai_matmul_matmul_f32$'
-xcrun nm -gU "${simulator_library}" | \
-  grep -q ' _mojo_ios_coreai_matmul_matmul_f32$'
 xcrun nm -gU "${device_library}" | grep -q ' _KGEN_CompilerRT_AlignedAlloc$'
 xcrun nm -gU "${simulator_library}" | grep -q ' _KGEN_CompilerRT_AlignedAlloc$'
 xcrun nm -gU "${device_library}" | grep -q ' _AsyncRT_DeviceContext_create$'
@@ -48,22 +44,10 @@ for metal_runtime_symbol in \
   xcrun nm -gU "${device_library}" | grep -q " _${metal_runtime_symbol}$"
   xcrun nm -gU "${simulator_library}" | grep -q " _${metal_runtime_symbol}$"
 done
-for coreai_runtime_symbol in \
-  AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2 \
-  AsyncRT_CoreAI_enqueueMatmulMatmulF32_2x3x4x2; do
-  xcrun nm -gU "${device_library}" | grep -q " _${coreai_runtime_symbol}$"
-  xcrun nm -gU "${simulator_library}" | grep -q " _${coreai_runtime_symbol}$"
-done
-for coreai_object in \
-  "${build_root}/iphoneos/MojoIOSCoreAI.o" \
-  "${build_root}/iphonesimulator/MojoIOSCoreAI.o"; do
-  if xcrun nm "${coreai_object}" | \
-    grep -q '__mojo_coreai_semantic_'; then
-    echo "unlowered Core AI semantic marker escaped into ${coreai_object}" >&2
-    exit 1
-  fi
-  if xcrun nm "${coreai_object}" | grep -Eiq 'Metal|MTL|air\.'; then
-    echo "Core AI object incorrectly references Metal/AIR: ${coreai_object}" >&2
+for library_path in "${device_library}" "${simulator_library}"; do
+  if xcrun nm -gU "${library_path}" | \
+    grep -Eq ' _(AsyncRT_CoreAI_|mojo_ios_coreai_|__mojo_coreai_semantic_)'; then
+    echo "project-specific Core AI graph ABI leaked into ${library_path}" >&2
     exit 1
   fi
 done
@@ -104,8 +88,6 @@ fi
 
 device_platform="$(xcrun otool -l "${build_root}/iphoneos/MojoIOSCore.o" | awk '/platform / { print $2; exit }')"
 simulator_platform="$(xcrun otool -l "${build_root}/iphonesimulator/MojoIOSCore.o" | awk '/platform / { print $2; exit }')"
-device_coreai_platform="$(xcrun otool -l "${build_root}/iphoneos/MojoIOSCoreAI.o" | awk '/platform / { print $2; exit }')"
-simulator_coreai_platform="$(xcrun otool -l "${build_root}/iphonesimulator/MojoIOSCoreAI.o" | awk '/platform / { print $2; exit }')"
 device_apple_work_queue_platform="$(xcrun otool -l "${build_root}/iphoneos/AsyncRTAppleWorkQueue.o" | awk '/platform / { print $2; exit }')"
 simulator_apple_work_queue_platform="$(xcrun otool -l "${build_root}/iphonesimulator/AsyncRTAppleWorkQueue.o" | awk '/platform / { print $2; exit }')"
 device_async_runtime_platform="$(xcrun otool -l "${build_root}/iphoneos/AsyncRTDeviceContextCAPI.o" | awk '/platform / { print $2; exit }')"
@@ -115,8 +97,6 @@ simulator_metal_runtime_platform="$(xcrun otool -l "${build_root}/iphonesimulato
 
 test "${device_platform}" = "2"
 test "${simulator_platform}" = "7"
-test "${device_coreai_platform}" = "2"
-test "${simulator_coreai_platform}" = "7"
 test "${device_apple_work_queue_platform}" = "2"
 test "${simulator_apple_work_queue_platform}" = "7"
 test "${device_async_runtime_platform}" = "2"
@@ -127,4 +107,4 @@ test "${simulator_metal_runtime_platform}" = "7"
 variant_count="$(/usr/libexec/PlistBuddy -c 'Print :AvailableLibraries' "${xcframework_path}/Info.plist" | grep -c 'Dict')"
 test "${variant_count}" = "2"
 
-echo "verified device platform=2, simulator platform=7, core/async/CoreAI exports, language AsyncRT, CPU/Metal/CoreAI DeviceContext runtime, and no CoreAI fallback symbols"
+echo "verified device platform=2, simulator platform=7, core/async exports, language AsyncRT, CPU/Metal runtime, and no project-specific Core AI graph ABI"

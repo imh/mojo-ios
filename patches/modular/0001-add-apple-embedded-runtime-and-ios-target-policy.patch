@@ -72,10 +72,10 @@ index 5df0b2db1c..0cad10ff15 100644
      srcs = glob(["lib/Runtime/Globals/*.cpp"]),
 diff --git a/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h b/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h
 new file mode 100644
-index 0000000000..4a78e5b259
+index 0000000000..b38c09c9f6
 --- /dev/null
 +++ b/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,78 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -119,19 +119,6 @@ index 0000000000..4a78e5b259
 +    int64_t handle_count);
 +const char *AsyncRT_DeviceContext_synchronize(void *context);
 +int64_t AsyncRT_DeviceContext_id(void *context);
-+
-+/// Execute the fixed-shape Float32 matmul -> matmul Core AI MVP region.
-+///
-+/// This is backend/runtime ABI, not a Mojo programming API.  The compiler's
-+/// Core AI region lowering is the only supported producer.  Work is ordered on
-+/// `context`; `AsyncRT_DeviceContext_synchronize` waits for completion and
-+/// returns any translated Swift/Core AI error.
-+const char *AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2(
-+    void *context, const float *input, const float *first_weights,
-+    const float *second_weights, float *output);
-+void AsyncRT_CoreAI_enqueueMatmulMatmulF32_2x3x4x2(
-+    void *context, const float *input, const float *first_weights,
-+    const float *second_weights, float *output);
 +
 +const char *AsyncRT_DeviceContext_createBuffer_async(void **result,
 +                                                     void **device_ptr,
@@ -422,10 +409,10 @@ index 0000000000..5f56e4b20a
 +#endif // ASYNCRT_RUNTIME_APPLE_WORK_QUEUE_H
 diff --git a/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
 new file mode 100644
-index 0000000000..eeb028c9ab
+index 0000000000..0a9dc82869
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
-@@ -0,0 +1,493 @@
+@@ -0,0 +1,350 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -444,7 +431,6 @@ index 0000000000..eeb028c9ab
 +
 +#include <assert.h>
 +#include <dispatch/dispatch.h>
-+#include <pthread.h>
 +#include <stdatomic.h>
 +#include <stddef.h>
 +#include <stdint.h>
@@ -464,30 +450,7 @@ index 0000000000..eeb028c9ab
 +typedef struct {
 +  AsyncRTAppleDeviceContextBase base;
 +  dispatch_group_t pending_tasks;
-+  dispatch_queue_t submission_queue;
-+  pthread_mutex_t error_mutex;
-+  char *first_error;
 +} AsyncRTCoreAIDeviceContext;
-+
-+typedef void (*AsyncRTCoreAICompletionFunction)(void *request,
-+                                                const char *error_message);
-+
-+/// Implemented by the generated Swift package support.  Keep this weak so an
-+/// application that never selects Core AI can still link the CPU/Metal runtime.
-+extern void MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2(
-+    const float *input, const float *first_weights,
-+    const float *second_weights, float *output, void *request,
-+    AsyncRTCoreAICompletionFunction completion) __attribute__((weak_import));
-+
-+typedef struct {
-+  AsyncRTCoreAIDeviceContext *context;
-+  const float *input;
-+  const float *first_weights;
-+  const float *second_weights;
-+  float *output;
-+  dispatch_semaphore_t completion_semaphore;
-+  char *error_message;
-+} AsyncRTCoreAIMatmulMatmulTask;
 +
 +typedef struct AsyncRTCoroutineBatch AsyncRTCoroutineBatch;
 +
@@ -531,7 +494,6 @@ index 0000000000..eeb028c9ab
 +  assert(atomic_load_explicit(&context->base.reference_count,
 +                              memory_order_acquire) > 0);
 +  assert(context->pending_tasks != NULL);
-+  assert(context->submission_queue != NULL);
 +  return context;
 +}
 +
@@ -553,56 +515,6 @@ index 0000000000..eeb028c9ab
 +  char *owned_message = strdup(message);
 +  assert(owned_message != NULL);
 +  return owned_message;
-+}
-+
-+static void asyncrt_apple_coreai_record_error(
-+    AsyncRTCoreAIDeviceContext *context, const char *error_message) {
-+  assert(context != NULL);
-+  if (error_message == NULL)
-+    return;
-+  int lock_result = pthread_mutex_lock(&context->error_mutex);
-+  assert(lock_result == 0);
-+  if (context->first_error == NULL) {
-+    context->first_error = strdup(error_message);
-+    assert(context->first_error != NULL);
-+  }
-+  int unlock_result = pthread_mutex_unlock(&context->error_mutex);
-+  assert(unlock_result == 0);
-+}
-+
-+static void asyncrt_apple_coreai_complete_matmul_matmul(
-+    void *untyped_task, const char *error_message) {
-+  AsyncRTCoreAIMatmulMatmulTask *task = untyped_task;
-+  assert(task != NULL);
-+  assert(task->completion_semaphore != NULL);
-+  assert(task->error_message == NULL);
-+  if (error_message != NULL) {
-+    task->error_message = strdup(error_message);
-+    assert(task->error_message != NULL);
-+  }
-+  (void)dispatch_semaphore_signal(task->completion_semaphore);
-+}
-+
-+static void
-+asyncrt_apple_coreai_execute_matmul_matmul(void *untyped_task) {
-+  AsyncRTCoreAIMatmulMatmulTask *task = untyped_task;
-+  assert(task != NULL);
-+  assert(task->context != NULL);
-+  assert(MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2 != NULL);
-+
-+  MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2(
-+      task->input, task->first_weights, task->second_weights, task->output,
-+      task, asyncrt_apple_coreai_complete_matmul_matmul);
-+  long wait_result = dispatch_semaphore_wait(task->completion_semaphore,
-+                                             DISPATCH_TIME_FOREVER);
-+  assert(wait_result == 0);
-+
-+  asyncrt_apple_coreai_record_error(task->context, task->error_message);
-+  free(task->error_message);
-+  dispatch_release(task->completion_semaphore);
-+  dispatch_group_leave(task->context->pending_tasks);
-+  AsyncRT_DeviceContext_release(task->context);
-+  free(task);
 +}
 +
 +static void asyncrt_apple_coroutine_task_execute(void *untyped_task) {
@@ -654,12 +566,6 @@ index 0000000000..eeb028c9ab
 +    context->base.kind = ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI;
 +    context->pending_tasks = dispatch_group_create();
 +    assert(context->pending_tasks != NULL);
-+    context->submission_queue = dispatch_queue_create(
-+        "org.modular.asyncrt.coreai.submission", DISPATCH_QUEUE_SERIAL);
-+    assert(context->submission_queue != NULL);
-+    int mutex_result = pthread_mutex_init(&context->error_mutex, NULL);
-+    assert(mutex_result == 0);
-+    context->first_error = NULL;
 +    *result = context;
 +    return NULL;
 +  }
@@ -714,13 +620,7 @@ index 0000000000..eeb028c9ab
 +                               DISPATCH_TIME_NOW) == 0 &&
 +           "the final Core AI DeviceContext reference cannot be released "
 +           "with pending tasks");
-+    assert(coreai_context->first_error == NULL &&
-+           "Core AI errors must be observed by synchronize before final "
-+           "release");
 +    coreai_context->base.magic = 0;
-+    int mutex_result = pthread_mutex_destroy(&coreai_context->error_mutex);
-+    assert(mutex_result == 0);
-+    dispatch_release(coreai_context->submission_queue);
 +    dispatch_release(coreai_context->pending_tasks);
 +    free(coreai_context);
 +    return;
@@ -849,13 +749,7 @@ index 0000000000..eeb028c9ab
 +    long wait_result =
 +        dispatch_group_wait(context->pending_tasks, DISPATCH_TIME_FOREVER);
 +    assert(wait_result == 0);
-+    int lock_result = pthread_mutex_lock(&context->error_mutex);
-+    assert(lock_result == 0);
-+    char *error_message = context->first_error;
-+    context->first_error = NULL;
-+    int unlock_result = pthread_mutex_unlock(&context->error_mutex);
-+    assert(unlock_result == 0);
-+    return error_message;
++    return NULL;
 +  }
 +  AsyncRTCPUDeviceContext *context =
 +      asyncrt_apple_device_context_from_untyped(untyped_context);
@@ -868,56 +762,6 @@ index 0000000000..eeb028c9ab
 +int64_t AsyncRT_DeviceContext_id(void *untyped_context) {
 +  (void)asyncrt_apple_device_context_base_from_untyped(untyped_context);
 +  return 0;
-+}
-+
-+const char *AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2(
-+    void *untyped_context, const float *input, const float *first_weights,
-+    const float *second_weights, float *output) {
-+  AsyncRTCoreAIDeviceContext *context =
-+      asyncrt_apple_coreai_context_from_untyped(untyped_context);
-+  if (MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2 == NULL)
-+    return asyncrt_apple_owned_error(
-+        "Core AI Swift runtime support is not linked");
-+  if (input == NULL)
-+    return asyncrt_apple_owned_error("Core AI region input is null");
-+  if (first_weights == NULL)
-+    return asyncrt_apple_owned_error(
-+        "Core AI region first weight tensor is null");
-+  if (second_weights == NULL)
-+    return asyncrt_apple_owned_error(
-+        "Core AI region second weight tensor is null");
-+  if (output == NULL)
-+    return asyncrt_apple_owned_error("Core AI region output is null");
-+
-+  AsyncRTCoreAIMatmulMatmulTask *task = calloc(1, sizeof(*task));
-+  assert(task != NULL);
-+  task->context = context;
-+  task->input = input;
-+  task->first_weights = first_weights;
-+  task->second_weights = second_weights;
-+  task->output = output;
-+  task->completion_semaphore = dispatch_semaphore_create(0);
-+  assert(task->completion_semaphore != NULL);
-+
-+  AsyncRT_DeviceContext_retain(context);
-+  dispatch_group_enter(context->pending_tasks);
-+  dispatch_async_f(context->submission_queue, task,
-+                   asyncrt_apple_coreai_execute_matmul_matmul);
-+  return NULL;
-+}
-+
-+void AsyncRT_CoreAI_enqueueMatmulMatmulF32_2x3x4x2(
-+    void *untyped_context, const float *input, const float *first_weights,
-+    const float *second_weights, float *output) {
-+  AsyncRTCoreAIDeviceContext *context =
-+      asyncrt_apple_coreai_context_from_untyped(untyped_context);
-+  const char *error_message =
-+      AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2(
-+          context, input, first_weights, second_weights, output);
-+  if (error_message == NULL)
-+    return;
-+  asyncrt_apple_coreai_record_error(context, error_message);
-+  AsyncRT_DeviceContext_strfree(error_message);
 +}
 diff --git a/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
 new file mode 100644
@@ -1980,318 +1824,6 @@ index b71bd3bc86..8a5d9f7271 100644
  /// BitcodeWriter17 - Legacy bitcode writer for LLVM bitcode version 17
  /// This class writes LLVM modules to bitcode format version 17, which is
  /// required for Metal compatibility.
-diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/CoreAIRegionPass.cpp b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/CoreAIRegionPass.cpp
-new file mode 100644
-index 0000000000..e23f8f8648
---- /dev/null
-+++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/CoreAIRegionPass.cpp
-@@ -0,0 +1,275 @@
-+//===----------------------------------------------------------------------===//
-+// Copyright (c) 2026, Modular Inc. All rights reserved.
-+//
-+// Licensed under the Apache License v2.0 with LLVM Exceptions.
-+//===----------------------------------------------------------------------===//
-+
-+#include "CoreAIRegionPass.h"
-+
-+#include "llvm/ADT/DenseSet.h"
-+#include "llvm/ADT/SmallVector.h"
-+#include "llvm/Analysis/ValueTracking.h"
-+#include "llvm/IR/CFG.h"
-+#include "llvm/IR/Constants.h"
-+#include "llvm/IR/Function.h"
-+#include "llvm/IR/IRBuilder.h"
-+#include "llvm/IR/Instructions.h"
-+#include "llvm/IR/Module.h"
-+#include "llvm/Support/ErrorHandling.h"
-+
-+namespace M::KGEN {
-+namespace {
-+
-+constexpr llvm::StringLiteral kMatmulMarker =
-+    "__mojo_coreai_semantic_matmul_f32";
-+constexpr llvm::StringLiteral kSynchronize =
-+    "AsyncRT_DeviceContext_synchronize";
-+constexpr llvm::StringLiteral kRegionRuntime =
-+    "AsyncRT_CoreAI_enqueueMatmulMatmulF32_2x3x4x2";
-+
-+[[noreturn]] static void fail(llvm::Twine message) {
-+  llvm::report_fatal_error(llvm::Twine("Core AI region formation: ") + message);
-+}
-+
-+static bool isNamedCall(const llvm::CallBase &call, llvm::StringRef name) {
-+  const llvm::Function *callee = call.getCalledFunction();
-+  return callee != nullptr && callee->getName() == name;
-+}
-+
-+static llvm::Value *canonicalPointer(llvm::Value *value) {
-+  value = value->stripPointerCasts();
-+  while (auto *phi = llvm::dyn_cast<llvm::PHINode>(value)) {
-+    if (phi->getNumIncomingValues() != 1)
-+      break;
-+    llvm::Value *incoming = phi->getIncomingValue(0)->stripPointerCasts();
-+    if (incoming == value)
-+      break;
-+    value = incoming;
-+  }
-+  return value;
-+}
-+
-+static bool blockCanReach(const llvm::BasicBlock *source,
-+                          const llvm::BasicBlock *destination) {
-+  if (source == destination)
-+    return true;
-+  llvm::SmallVector<const llvm::BasicBlock *, 16> worklist{source};
-+  llvm::DenseSet<const llvm::BasicBlock *> visited;
-+  while (!worklist.empty()) {
-+    const llvm::BasicBlock *block = worklist.pop_back_val();
-+    if (!visited.insert(block).second)
-+      continue;
-+    for (const llvm::BasicBlock *successor : llvm::successors(block)) {
-+      if (successor == destination)
-+        return true;
-+      worklist.push_back(successor);
-+    }
-+  }
-+  return false;
-+}
-+
-+static bool instructionIsStrictlyBetween(const llvm::Instruction &instruction,
-+                                         const llvm::Instruction &begin,
-+                                         const llvm::Instruction &end) {
-+  if (&instruction == &begin || &instruction == &end)
-+    return false;
-+  const llvm::BasicBlock *block = instruction.getParent();
-+  const llvm::BasicBlock *beginBlock = begin.getParent();
-+  const llvm::BasicBlock *endBlock = end.getParent();
-+  if (!blockCanReach(beginBlock, block) || !blockCanReach(block, endBlock))
-+    return false;
-+
-+  if (block == beginBlock) {
-+    bool afterBegin = false;
-+    for (const llvm::Instruction &candidate : *block) {
-+      if (&candidate == &begin) {
-+        afterBegin = true;
-+        continue;
-+      }
-+      if (&candidate == &instruction)
-+        return afterBegin && &instruction != &end;
-+    }
-+    llvm_unreachable("instruction is not in its parent block");
-+  }
-+  if (block == endBlock) {
-+    for (const llvm::Instruction &candidate : *block) {
-+      if (&candidate == &end)
-+        return false;
-+      if (&candidate == &instruction)
-+        return true;
-+    }
-+    llvm_unreachable("instruction is not in its parent block");
-+  }
-+  return true;
-+}
-+
-+static bool isAllowedBookkeepingCall(const llvm::CallBase &call) {
-+  const llvm::Function *callee = call.getCalledFunction();
-+  if (callee == nullptr)
-+    return false;
-+  if (callee->isIntrinsic())
-+    return callee->getIntrinsicID() == llvm::Intrinsic::lifetime_start ||
-+           callee->getIntrinsicID() == llvm::Intrinsic::lifetime_end ||
-+           callee->getIntrinsicID() == llvm::Intrinsic::dbg_declare ||
-+           callee->getIntrinsicID() == llvm::Intrinsic::dbg_value;
-+  llvm::StringRef name = callee->getName();
-+  if (name == "AsyncRT_DeviceContext_retain" ||
-+      name == "AsyncRT_DeviceContext_release")
-+    return true;
-+
-+  // At O0 the standard matmul's Optional[DeviceContext] parameter retains
-+  // explicit ownership wrappers around each semantic marker. These calls can
-+  // only construct, inspect, or destroy the context container; they do not
-+  // receive graph tensor pointers. Keep the accepted set exhaustive so a new
-+  // wrapper kind fails region formation instead of silently crossing it.
-+  if (!name.contains("max::gpu::host::device_context::DeviceContext"))
-+    return false;
-+  return name.starts_with(
-+             "max::gpu::host::device_context::DeviceContext::__init__(copy") ||
-+         name.starts_with("std::collections::optional::Optional::__init__") ||
-+         name.starts_with("std::utils::variant::Variant::isa") ||
-+         name.starts_with("std::utils::variant::Variant::__deinit__");
-+}
-+
-+static bool isAllocaAccess(const llvm::Value *pointer) {
-+  return llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(pointer));
-+}
-+
-+static void requireNoObservableEffectsBetween(const llvm::Instruction &begin,
-+                                              const llvm::Instruction &end) {
-+  for (const llvm::BasicBlock &block : *begin.getFunction()) {
-+    for (const llvm::Instruction &instruction : block) {
-+      if (!instructionIsStrictlyBetween(instruction, begin, end))
-+        continue;
-+      if (const auto *call = llvm::dyn_cast<llvm::CallBase>(&instruction)) {
-+        if (isNamedCall(*call, kMatmulMarker) ||
-+            isAllowedBookkeepingCall(*call))
-+          continue;
-+        fail(llvm::Twine("unsupported call '") +
-+             (call->getCalledFunction() ? call->getCalledFunction()->getName()
-+                                        : "indirect") +
-+             "' splits the explicitly selected graph region");
-+      }
-+      if (const auto *load = llvm::dyn_cast<llvm::LoadInst>(&instruction)) {
-+        if (!load->isVolatile() && isAllocaAccess(load->getPointerOperand()))
-+          continue;
-+        fail("observable or non-local load splits the graph region");
-+      }
-+      if (const auto *store = llvm::dyn_cast<llvm::StoreInst>(&instruction)) {
-+        if (!store->isVolatile() && isAllocaAccess(store->getPointerOperand()))
-+          continue;
-+        fail("observable or non-local store splits the graph region");
-+      }
-+      if (instruction.mayHaveSideEffects() && !instruction.isTerminator())
-+        fail(llvm::Twine("unsupported side-effecting instruction '") +
-+             instruction.getOpcodeName() + "' splits the graph region");
-+    }
-+  }
-+}
-+
-+static uint64_t constantDimension(const llvm::CallBase &marker,
-+                                  unsigned argumentIndex,
-+                                  llvm::StringRef dimensionName) {
-+  const auto *constant =
-+      llvm::dyn_cast<llvm::ConstantInt>(marker.getArgOperand(argumentIndex));
-+  if (constant == nullptr)
-+    fail(llvm::Twine("dynamic '") + dimensionName +
-+         "' dimension is not implemented");
-+  return constant->getZExtValue();
-+}
-+
-+static void requireDimensions(const llvm::CallBase &marker, uint64_t rows,
-+                              uint64_t reduction, uint64_t columns,
-+                              llvm::StringRef operationName) {
-+  if (marker.arg_size() != 6)
-+    fail(llvm::Twine(operationName) + " semantic marker ABI is invalid");
-+  if (constantDimension(marker, 3, "rows") != rows ||
-+      constantDimension(marker, 4, "reduction") != reduction ||
-+      constantDimension(marker, 5, "columns") != columns)
-+    fail(llvm::Twine(operationName) +
-+         " shape is not implemented; the MVP supports [2,3] x [3,4] "
-+         "followed by [2,4] x [4,2]");
-+}
-+
-+static llvm::CallBase *findSynchronizeAfter(llvm::CallBase &marker) {
-+  llvm::CallBase *result = nullptr;
-+  for (llvm::BasicBlock &block : *marker.getFunction()) {
-+    for (llvm::Instruction &instruction : block) {
-+      auto *call = llvm::dyn_cast<llvm::CallBase>(&instruction);
-+      if (call == nullptr || !isNamedCall(*call, kSynchronize) ||
-+          !blockCanReach(marker.getParent(), call->getParent()))
-+        continue;
-+      if (result != nullptr)
-+        fail("a two-operation MVP region must have exactly one reachable "
-+             "DeviceContext.synchronize boundary");
-+      result = call;
-+    }
-+  }
-+  if (result == nullptr)
-+    fail("a two-operation MVP region requires DeviceContext.synchronize");
-+  return result;
-+}
-+
-+} // namespace
-+
-+llvm::PreservedAnalyses
-+CoreAIRegionPass::run(llvm::Module &module,
-+                      llvm::ModuleAnalysisManager &analysisManager) {
-+  (void)analysisManager;
-+  llvm::Function *markerDeclaration = module.getFunction(kMatmulMarker);
-+  if (markerDeclaration == nullptr || markerDeclaration->use_empty())
-+    return llvm::PreservedAnalyses::all();
-+
-+  llvm::SmallVector<llvm::CallBase *, 4> markers;
-+  for (llvm::User *user : markerDeclaration->users()) {
-+    auto *call = llvm::dyn_cast<llvm::CallBase>(user);
-+    if (call == nullptr || call->getCalledFunction() != markerDeclaration)
-+      fail("the matmul semantic marker has a non-direct use");
-+    markers.push_back(call);
-+  }
-+  if (markers.size() != 2)
-+    fail(llvm::Twine("the MVP implements exactly two connected matmuls, found ") +
-+         llvm::Twine(markers.size()));
-+  if (markers[0]->getFunction() != markers[1]->getFunction())
-+    fail("the two MVP matmuls must be in one function");
-+  if (!blockCanReach(markers[0]->getParent(), markers[1]->getParent()))
-+    std::swap(markers[0], markers[1]);
-+  if (!blockCanReach(markers[0]->getParent(), markers[1]->getParent()))
-+    fail("the two MVP matmuls are not in execution order");
-+
-+  llvm::CallBase &first = *markers[0];
-+  llvm::CallBase &second = *markers[1];
-+  requireDimensions(first, 2, 3, 4, "first matmul");
-+  requireDimensions(second, 2, 4, 2, "second matmul");
-+  if (canonicalPointer(first.getArgOperand(0)) !=
-+      canonicalPointer(second.getArgOperand(1)))
-+    fail("the second matmul input is not the first matmul output");
-+
-+  llvm::CallBase *synchronize = findSynchronizeAfter(second);
-+  requireNoObservableEffectsBetween(first, second);
-+  requireNoObservableEffectsBetween(second, *synchronize);
-+  if (synchronize->arg_size() != 1)
-+    fail("DeviceContext.synchronize ABI is invalid");
-+
-+  llvm::IRBuilder<> builder(synchronize);
-+  llvm::Type *voidType = llvm::Type::getVoidTy(module.getContext());
-+  llvm::Type *contextType = synchronize->getArgOperand(0)->getType();
-+  llvm::Type *pointerType = first.getArgOperand(0)->getType();
-+  llvm::FunctionType *runtimeType = llvm::FunctionType::get(
-+      voidType,
-+      {contextType, pointerType, pointerType, pointerType, pointerType}, false);
-+  llvm::FunctionCallee runtime =
-+      module.getOrInsertFunction(kRegionRuntime, runtimeType);
-+  builder.CreateCall(runtime,
-+                     {synchronize->getArgOperand(0), first.getArgOperand(1),
-+                      first.getArgOperand(2), second.getArgOperand(2),
-+                      second.getArgOperand(0)});
-+
-+  first.eraseFromParent();
-+  second.eraseFromParent();
-+  if (markerDeclaration->use_empty())
-+    markerDeclaration->eraseFromParent();
-+  return llvm::PreservedAnalyses::none();
-+}
-+
-+} // namespace M::KGEN
-diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/CoreAIRegionPass.h b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/CoreAIRegionPass.h
-new file mode 100644
-index 0000000000..b7d066f9b8
---- /dev/null
-+++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/CoreAIRegionPass.h
-@@ -0,0 +1,25 @@
-+//===----------------------------------------------------------------------===//
-+// Copyright (c) 2026, Modular Inc. All rights reserved.
-+//
-+// Licensed under the Apache License v2.0 with LLVM Exceptions.
-+//===----------------------------------------------------------------------===//
-+
-+#ifndef KGEN_COMPILER_LLVMIR_TRANSFORMS_COREAIREGIONPASS_H
-+#define KGEN_COMPILER_LLVMIR_TRANSFORMS_COREAIREGIONPASS_H
-+
-+#include "llvm/IR/PassManager.h"
-+
-+namespace M::KGEN {
-+
-+/// Forms explicitly selected Core AI semantic operations into supported AOT
-+/// graph regions.  Unsupported shapes, operation counts, effects, and region
-+/// boundaries are hard compile errors; this pass never selects CPU or Metal.
-+class CoreAIRegionPass : public llvm::PassInfoMixin<CoreAIRegionPass> {
-+public:
-+  llvm::PreservedAnalyses run(llvm::Module &module,
-+                              llvm::ModuleAnalysisManager &analysisManager);
-+};
-+
-+} // namespace M::KGEN
-+
-+#endif // KGEN_COMPILER_LLVMIR_TRANSFORMS_COREAIREGIONPASS_H
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
 new file mode 100644
 index 0000000000..5e57d2f5e7
@@ -2901,38 +2433,6 @@ index 0000000000..d15869ad93
 +} // namespace M::KGEN
 +
 +#endif // KGEN_COMPILER_LLVMIR_TRANSFORMS_METALAIRPASS_H
-diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVMPassesPipeline.cpp b/KGEN/lib/Compiler/ObjectCompiler/LLVMPassesPipeline.cpp
-index 18a9847bd1..0403486e7a 100644
---- a/KGEN/lib/Compiler/ObjectCompiler/LLVMPassesPipeline.cpp
-+++ b/KGEN/lib/Compiler/ObjectCompiler/LLVMPassesPipeline.cpp
-@@ -17,6 +17,7 @@
- #include "KGEN/ToolCommon/CompilationOptions.h"
- #include "LLVMAccessorHelper.h"
- #include "MCLinker.h"
-+#include "LLVM/Transforms/CoreAIRegionPass.h"
- #include "LLVM/Transforms/LLVMIRDowngradePass.h"
- #include "LLVM/Transforms/SetFunctionAttributes.h"
- #include "llvm/Analysis/GlobalsModRef.h"
-@@ -376,6 +377,8 @@ static ModulePassManager buildO3Pipeline(PassBuilder &passBuilder,
-   if (backend)
-     backend->addPipelineStartPasses(mpm, options);
- 
-+  mpm.addPass(CoreAIRegionPass());
-+
-   // Do basic inference of function attributes from known properties of system
-   // libraries and other oracles.
-   mpm.addPass(InferFunctionAttrsPass());
-@@ -555,6 +558,10 @@ static ModulePassManager buildO0Pipeline(PassBuilder &passBuilder,
-   // code generation.
-   mpm.addPass(AlwaysInlinerPass(
-       /*InsertLifetimeIntrinsics=*/false));
-+  // Standard operations must be inlined before their backend-neutral semantic
-+  // markers are formed into Core AI graph regions. This is especially
-+  // important at O0, where frontend wrapper SSA otherwise remains visible.
-+  mpm.addPass(CoreAIRegionPass());
-   CGSCCPassManager cgpm;
-   passBuilder.invokeCGSCCOptimizerLateEPCallbacks(cgpm, level);
-   mpm.addPass(createModuleToPostOrderCGSCCPassAdaptor(std::move(cgpm)));
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp b/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
 index fcd0786720..cebfc34515 100644
 --- a/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
@@ -4780,78 +4280,29 @@ index 1e3797a730..b28bd1c860 100644
      "System/Library/Frameworks/Security.framework/**",
      "System/Library/Frameworks/SystemConfiguration.framework/**",
 diff --git a/max/kernels/src/linalg/matmul/__init__.mojo b/max/kernels/src/linalg/matmul/__init__.mojo
-index 01ec97da7b..4546f841d0 100644
+index 01ec97da7b..fe91e48eeb 100644
 --- a/max/kernels/src/linalg/matmul/__init__.mojo
 +++ b/max/kernels/src/linalg/matmul/__init__.mojo
-@@ -19,7 +19,8 @@ from std.math import align_up, ceildiv
+@@ -19,7 +19,7 @@ from std.math import align_up, ceildiv
  from std.sys.info import align_of, simd_width_of
  
  from max.gpu.host import DeviceContext
 -from max.gpu.host.info import is_cpu, is_valid_target
-+from max.gpu.host.device_context import _record_coreai_matmul_f32
 +from max.gpu.host.info import is_coreai, is_cpu, is_valid_target
  from layout import (
      Layout,
      LayoutTensor,
-@@ -104,7 +105,61 @@ def matmul[
+@@ -104,7 +104,13 @@ def matmul[
      comptime assert a.flat_rank == 2, "a must have a non-nested layout"
      comptime assert b.flat_rank == 2, "b must have a non-nested layout"
  
 -    comptime if not is_cpu[target]():
 +    comptime if is_coreai[target]():
-+        comptime assert not transpose_a, (
-+            "Core AI matmul does not implement transpose_a"
++        comptime assert False, (
++            "Core AI graph lowering is not implemented in the open-source "
++            "MAX graph compiler; fixed LLVM marker lowering is intentionally "
++            "unsupported"
 +        )
-+        comptime assert not transpose_b, (
-+            "Core AI matmul does not implement transpose_b"
-+        )
-+        comptime assert not b_packed, (
-+            "Core AI matmul does not implement packed CPU weights"
-+        )
-+        comptime assert not elementwise_lambda_fn, (
-+            "Core AI matmul does not implement an elementwise epilogue"
-+        )
-+        comptime assert not elementwise_compute_lambda_fn, (
-+            "Core AI matmul does not implement a compute epilogue"
-+        )
-+        comptime assert not saturated_vnni, (
-+            "Core AI matmul does not implement saturated VNNI"
-+        )
-+        comptime assert c.dtype == DType.float32, (
-+            "Core AI MVP matmul implements only Float32 output"
-+        )
-+        comptime assert a.dtype == DType.float32, (
-+            "Core AI MVP matmul implements only Float32 input"
-+        )
-+        comptime assert b.dtype == DType.float32, (
-+            "Core AI MVP matmul implements only Float32 weights"
-+        )
-+        comptime assert c.shape_known and a.shape_known and b.shape_known, (
-+            "Core AI MVP matmul requires fixed shapes"
-+        )
-+        comptime assert (
-+            c.static_stride[1] == 1
-+            and c.static_stride[0] == c.static_shape[1]
-+            and a.static_stride[1] == 1
-+            and a.static_stride[0] == a.static_shape[1]
-+            and b.static_stride[1] == 1
-+            and b.static_stride[0] == b.static_shape[1]
-+        ), "Core AI MVP matmul requires contiguous row-major tensors"
-+        comptime assert (
-+            a.static_shape[0] == c.static_shape[0]
-+            and a.static_shape[1] == b.static_shape[0]
-+            and b.static_shape[1] == c.static_shape[1]
-+        ), "Core AI matmul shapes are incompatible"
-+        assert Bool(ctx), "expected DeviceContext for Core AI target"
-+        _record_coreai_matmul_f32(
-+            c.ptr,
-+            a.ptr,
-+            b.ptr,
-+            c.static_shape[0],
-+            a.static_shape[1],
-+            c.static_shape[1],
-+        )
-+        return
 +    elif not is_cpu[target]():
          # GPU path: call _matmul_gpu directly with tracing. CPU-only params
          # (b_packed, saturated_vnni) are intentionally not forwarded here.
@@ -4999,54 +4450,10 @@ index 103beda300..4791f3f654 100644
  
      var metal_args_addrs = unsafe_stack_allocation[
 diff --git a/max/mojo/max/gpu/host/device_context.mojo b/max/mojo/max/gpu/host/device_context.mojo
-index cc56890d81..c3ee5f2e22 100644
+index cc56890d81..bf86d2192c 100644
 --- a/max/mojo/max/gpu/host/device_context.mojo
 +++ b/max/mojo/max/gpu/host/device_context.mojo
-@@ -3883,6 +3883,43 @@ struct DeviceExternalFunction:
-         return Int(result)
- 
- 
-+@doc_hidden
-+@always_inline
-+def _record_coreai_matmul_f32[
-+    output_dtype: DType,
-+    input_dtype: DType,
-+    weights_dtype: DType,
-+    output_origin: MutOrigin,
-+    input_origin: Origin,
-+    weights_origin: Origin,
-+](
-+    output: Pointer[Scalar[output_dtype], output_origin],
-+    input: Pointer[Scalar[input_dtype], input_origin],
-+    weights: Pointer[Scalar[weights_dtype], weights_origin],
-+    rows: Int,
-+    reduction: Int,
-+    columns: Int,
-+):
-+    """Records one semantic matmul for generic Core AI region formation.
-+
-+    This is an internal compiler marker.  It deliberately has no runtime
-+    implementation: a surviving call means Core AI region formation did not
-+    recognize the complete standard-operation region and must fail at link
-+    time rather than execute a CPU or Metal fallback.
-+    """
-+    comptime assert output_dtype == DType.float32
-+    comptime assert input_dtype == DType.float32
-+    comptime assert weights_dtype == DType.float32
-+    external_call["__mojo_coreai_semantic_matmul_f32", NoneType](
-+        output,
-+        input,
-+        weights,
-+        rows,
-+        reduction,
-+        columns,
-+    )
-+
-+
- struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
-     """Represents a single stream of execution on a particular accelerator
-     (GPU).
-@@ -4684,6 +4721,98 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
+@@ -4684,6 +4684,98 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
              location=location.or_else(call_location()),
          )
  
@@ -5305,10 +4712,79 @@ index ed6c8f8515..75be889afa 100644
          if not handle:
              var error_message = dlerror()
 diff --git a/mojo/stdlib/std/gpu/host/info.mojo b/mojo/stdlib/std/gpu/host/info.mojo
-index b50f997970..8b10e99a33 100644
+index b50f997970..3eb8bb987c 100644
 --- a/mojo/stdlib/std/gpu/host/info.mojo
 +++ b/mojo/stdlib/std/gpu/host/info.mojo
-@@ -322,6 +322,29 @@ def _get_metal_m4_target() -> _TargetType:
+@@ -271,6 +271,22 @@ def _get_metal_m1_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M1 Metal.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios15.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m1", `,
++                `features = "+metal2_4,+air2_4_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios15.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m1", `,
++            `features = "+metal2_4,+air2_4_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -288,6 +304,22 @@ def _get_metal_m2_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M2 Metal.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios15.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m2", `,
++                `features = "+metal2_4,+air2_4_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios15.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m2", `,
++            `features = "+metal2_4,+air2_4_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -305,6 +337,22 @@ def _get_metal_m3_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M3 Metal.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios15.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m3", `,
++                `features = "+metal2_4,+air2_4_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios15.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m3", `,
++            `features = "+metal2_4,+air2_4_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -322,6 +370,29 @@ def _get_metal_m4_target() -> _TargetType:
      Returns:
          MLIR target configuration for M4 Metal.
      """
@@ -5338,7 +4814,145 @@ index b50f997970..8b10e99a33 100644
      return __mlir_attr[
          `#kgen.target<triple = "air64-apple-macosx", `,
          `stdlib_plugin = "metal", `,
-@@ -2319,16 +2342,44 @@ def is_npu(target: StringSlice) -> Bool:
+@@ -339,6 +410,22 @@ def _get_metal_m5_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M5 Metal.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios15.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m5", `,
++                `features = "+metal2_4,+air2_4_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios15.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m5", `,
++            `features = "+metal2_4,+air2_4_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -356,6 +443,22 @@ def _get_metal_m1_metal4_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M1 Metal 4.0.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m1", `,
++                `features = "+metal4_0,+air2_8_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios27.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m1", `,
++            `features = "+metal4_0,+air2_8_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -373,6 +476,22 @@ def _get_metal_m2_metal4_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M2 Metal 4.0.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m2", `,
++                `features = "+metal4_0,+air2_8_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios27.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m2", `,
++            `features = "+metal4_0,+air2_8_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -390,6 +509,22 @@ def _get_metal_m3_metal4_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M3 Metal 4.0.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m3", `,
++                `features = "+metal4_0,+air2_8_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios27.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m3", `,
++            `features = "+metal4_0,+air2_8_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -407,6 +542,22 @@ def _get_metal_m4_metal4_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M4 Metal 4.0.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m4", `,
++                `features = "+metal4_0,+air2_8_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios27.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m4", `,
++            `features = "+metal4_0,+air2_8_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -424,6 +575,22 @@ def _get_metal_m5_metal4_target() -> _TargetType:
+     Returns:
+         MLIR target configuration for M5 Metal 4.0.
+     """
++    comptime if CompilationTarget.is_ios():
++        comptime if CompilationTarget.is_simulator():
++            return __mlir_attr[
++                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
++                `stdlib_plugin = "metal", arch = "apple-m5", `,
++                `features = "+metal4_0,+air2_8_0", `,
++                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++                `simd_bit_width = 128> : !kgen.target`,
++            ]
++        return __mlir_attr[
++            `#kgen.target<triple = "air64-apple-ios27.0", `,
++            `stdlib_plugin = "metal", arch = "apple-m5", `,
++            `features = "+metal4_0,+air2_8_0", `,
++            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
++            `simd_bit_width = 128> : !kgen.target`,
++        ]
+     return __mlir_attr[
+         `#kgen.target<triple = "air64-apple-macosx", `,
+         `stdlib_plugin = "metal", `,
+@@ -2319,10 +2486,38 @@ def is_npu(target: StringSlice) -> Bool:
      return target == "npu"
  
  
@@ -5373,55 +4987,38 @@ index b50f997970..8b10e99a33 100644
      """Checks if the target is an accelerator (compile-time version).
  
 -    True for any non-CPU compute target -- GPUs and NPUs alike.
-+    True for any non-CPU compute target -- GPUs, NPUs, and managed Core AI
-+    graphs alike.
++    True for programmable accelerator targets. Managed graph backends such as
++    Core AI are not accelerator kernels and must be dispatched explicitly.
  
      Parameters:
          target: Target string to check.
- 
-     Returns:
--        True if the target is a GPU or NPU, False otherwise.
-+        True if the target is a GPU, NPU, or Core AI, False otherwise.
-     """
-     return is_accelerator(target)
- 
-@@ -2336,15 +2387,16 @@ def is_accelerator[target: StringSlice]() -> Bool:
+@@ -2336,7 +2531,8 @@ def is_accelerator[target: StringSlice]() -> Bool:
  def is_accelerator(target: StringSlice) -> Bool:
      """Checks if the target is an accelerator (runtime version).
  
 -    True for any non-CPU compute target -- GPUs and NPUs alike.
-+    True for any non-CPU compute target -- GPUs, NPUs, and managed Core AI
-+    graphs alike.
++    True for programmable accelerator targets. Managed graph backends such as
++    Core AI are not accelerator kernels and must be dispatched explicitly.
  
      Args:
          target: Target string to check.
- 
-     Returns:
--        True if the target is a GPU or NPU, False otherwise.
-+        True if the target is a GPU, NPU, or Core AI, False otherwise.
-     """
--    return is_gpu(target) or is_npu(target)
-+    return is_gpu(target) or is_npu(target) or is_coreai(target)
- 
- 
- def is_valid_target[target: StringSlice]() -> Bool:
-@@ -2354,7 +2406,8 @@ def is_valid_target[target: StringSlice]() -> Bool:
+@@ -2354,7 +2550,8 @@ def is_valid_target[target: StringSlice]() -> Bool:
          target: Target string to check.
  
      Returns:
 -        True if the target is valid (CPU, GPU, or NPU), False otherwise.
-+        True if the target is valid (CPU, GPU, NPU, or Core AI), False
-+        otherwise.
++        True if the target has an implemented standard operation-dispatch
++        contract (CPU, GPU, or NPU), False otherwise.
      """
      return is_valid_target(target)
  
-@@ -2366,6 +2419,7 @@ def is_valid_target(target: StringSlice) -> Bool:
+@@ -2366,6 +2563,7 @@ def is_valid_target(target: StringSlice) -> Bool:
          target: Target string to check.
  
      Returns:
 -        True if the target is valid (CPU, GPU, or NPU), False otherwise.
-+        True if the target is valid (CPU, GPU, NPU, or Core AI), False
-+        otherwise.
++        True if the target has an implemented standard operation-dispatch
++        contract (CPU, GPU, or NPU), False otherwise.
      """
      return is_cpu(target) or is_accelerator(target)
 diff --git a/mojo/stdlib/std/io/file.mojo b/mojo/stdlib/std/io/file.mojo

@@ -48,10 +48,11 @@ must not be inferred from a nearby item.
   threadgroup memory on Mac, Simulator, and physical iPad, but unlisted Metal
   resource classes and operations remain outside the support claim.
 - General Core AI graph export, model packaging, and runtime integration. A
-  fixed-shape direct-authoring/AOT/Swift-link feasibility slice passes with
-  Xcode 27, but stable public operation-builder imports, Mojo graph conversion,
-  package resource composition, and iPadOS 27 execution are not yet part of the
-  supported artifact.
+  fixed-shape direct-authoring/AOT/public-Swift feasibility slice passes with
+  Xcode 27, including physical iPadOS 27 execution, but it is deliberately not
+  linked to Mojo. The open-source MAX graph compiler/driver has no backend
+  extension point for Core AI, so standard Mojo lowering fails explicitly and
+  no Core AI resource is part of the supported package.
 - ANE-only execution. Core AI can prefer ANE but currently cannot require it or
   report per-operation residency. Private ANE compiler/runtime APIs are not an
   acceptable substitute.

@@ -21,7 +21,7 @@ The compiler and model authoring tools run on macOS. The application ships
 only static CPU objects, immutable Metal/Core AI resources, and Swift glue. It
 ships no Mojo compiler or executable Mojo input.
 
-The follow-on fixed standard-Mojo vertical slice is documented in
+The standard-backend architectural gate is documented in
 [COREAI_MVP_GATE.md](COREAI_MVP_GATE.md).
 
 ## Proven Apple toolchain slice
@@ -72,23 +72,21 @@ This is not yet a complete Phase 3 verdict:
    `Value` from underscored `coreai._compiler` modules and says their public
    `coreai.authoring` re-export is pending. The probe deliberately isolates
    those imports. They are feasibility evidence, not a stable production API.
-2. A generic compiler pass now forms one exact two-matmul region from ordinary
-   standard-operation semantic markers. General operations, shapes, dtypes,
-   layouts, effects, and graph partitioning remain unimplemented; this is not
-   an arbitrary Mojo-to-Core-AI claim.
-3. The source asset and deterministic manifest are preserved in the Swift
-   package beside the XCFramework. Release versioning and an explicit policy
-   for shipping or selecting the emitted per-architecture `.aimodelc` assets
-   remain to be implemented.
-4. Xcode 27's iPhone Simulator SDK contains no `CoreAI.framework`. The package
-   therefore compiles an explicit unavailable runtime error for Simulator; it
-   does not substitute CPU or Metal execution.
-5. The public Swift runtime passes on the connected M1 iPad Pro running iPadOS
-   27 beta 7 (`24A5424a`). Three sequential calls and ten rounds of eight
-   simultaneous calls from GCD-owned Swift threads produce exact output with no
-   fallback. The bridge caches the model and gives each request its own loaded
-   function after stress testing found shared-function output corruption.
-   Broader device-side negative-resource and pending-work lifetime coverage
+2. The open-source MAX tree does not contain the graph compiler/driver extension
+   required to add a real backend. Standard Core AI lowering is therefore a
+   named compile-time `NotImplemented`; there is no fixed marker, LLVM pattern
+   pass, or project runtime ABI.
+3. The source asset, compiled specializations, and deterministic manifest are
+   build-only probe outputs. They are not preserved in the Swift package or
+   presented as compiler output. Release packaging belongs to a future normal
+   MAX backend.
+4. Xcode 27's iPhone Simulator SDK contains no `CoreAI.framework`. No CPU or
+   Metal simulator substitute is permitted.
+5. The standalone public Swift probe passes on the connected M1 iPad Pro
+   running iPadOS 27 beta 7 (`24A5424a`). Three sequential calls and ten rounds of eight
+   simultaneous calls produce exact output with no fallback. The app does not
+   link Mojo or AsyncRT, so this is Apple API feasibility rather than backend
+   execution evidence. Broader device-side negative and lifetime coverage
    remains to be added.
 6. `--preferred-compute neural-engine` and
    `SpecializationOptions(preferredComputeUnitKind: .neuralEngine)` prove only
@@ -137,7 +135,7 @@ M1 iPad Pro with iPadOS 27 beta 7 it signs, installs, runs the sequential and
 concurrent numerical gate, and retrieves a nonce-bound success record from the
 app container.
 
-The current verdict is **GO** for the direct graph and the fixed standard-Mojo
-two-matmul MVP through physical iPadOS 27 execution. General Core AI coverage,
-device negative/lifetime expansion, and placement observation remain
-**incomplete** at the explicit boundaries above.
+The current verdict is **GO** for the isolated Apple direct-graph feasibility
+probe through physical iPadOS 27 execution, and **NOT IMPLEMENTED** for standard
+Mojo/MAX Core AI lowering. Device negative/lifetime expansion and placement
+observation also remain incomplete at the explicit boundaries above.

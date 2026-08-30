@@ -11,8 +11,8 @@ from std.gpu.host.info import (
 @export("mojo_ios_coreai_target_contract")
 def mojo_ios_coreai_target_contract() abi("C") -> Int32:
     comptime assert is_coreai["coreai"]()
-    comptime assert is_accelerator["coreai"]()
-    comptime assert is_valid_target["coreai"]()
+    comptime assert not is_accelerator["coreai"]()
+    comptime assert not is_valid_target["coreai"]()
     comptime assert not is_cpu["coreai"]()
     comptime assert not is_gpu["coreai"]()
     comptime assert not is_npu["coreai"]()

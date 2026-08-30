@@ -4,7 +4,6 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output_root="${project_root}/build/coreai-mvp"
 compiled_root="${output_root}/compiled"
-resource_root="${project_root}/Sources/MojoIOS/Resources"
 asset_name="CoreAIMatmulMatmulF32.aimodel"
 authoring_python="${project_root}/.work/coreai-venv/bin/python"
 
@@ -12,7 +11,6 @@ authoring_python="${project_root}/.work/coreai-venv/bin/python"
 export DEVELOPER_DIR="${MOJO_IOS_COREAI_DEVELOPER_DIR}"
 
 test -x "${authoring_python}"
-test -d "${resource_root}"
 coreai_build="$(xcrun --find coreai-build)"
 xcode_version_output="$(xcodebuild -version)"
 xcode_version="$(sed -n '1s/^Xcode //p' <<<"${xcode_version_output}")"
@@ -56,12 +54,4 @@ PYTHONFAULTHANDLER=1 "${authoring_python}" -X faulthandler \
   --coreai-build-version "${coreai_build_version}" \
   --authoring-version "${authoring_version}"
 
-packaged_asset="${resource_root}/${asset_name}"
-test "${packaged_asset}" = \
-  "${project_root}/Sources/MojoIOS/Resources/CoreAIMatmulMatmulF32.aimodel"
-rm -rf -- "${packaged_asset}"
-ditto "${output_root}/${asset_name}" "${packaged_asset}"
-cp "${output_root}/CoreAIMVPManifest.json" \
-  "${resource_root}/CoreAIMVPManifest.json"
-
-echo "COREAI_MVP_RESOURCE_PASS graph=matmul-matmul aot=ios27 package=hashed fallback=none"
+echo "COREAI_MVP_RESOURCE_PASS graph=direct-probe-matmul-matmul aot=ios27 output=build-only package=none fallback=none"

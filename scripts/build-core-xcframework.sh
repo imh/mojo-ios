@@ -19,7 +19,6 @@ xcframework_path="${build_root}/MojoIOSCore.xcframework"
 device_library_path="${device_root}/libMojoIOSCore.a"
 simulator_library_path="${simulator_root}/libMojoIOSCore.a"
 source_path="${project_root}/mojo/MojoIOSCore.mojo"
-coreai_source_path="${project_root}/mojo/MojoIOSCoreAI.mojo"
 runtime_source_path="${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c"
 kgen_async_runtime_source_path="${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c"
 globals_source_path="${upstream_root}/KGEN/lib/CompilerRT/Embedded/Globals.c"
@@ -38,7 +37,6 @@ test -f "${globals_source_path}"
 test -f "${apple_work_queue_source_path}"
 test -f "${async_runtime_source_path}"
 test -f "${metal_runtime_source_path}"
-test -f "${coreai_source_path}"
 test -f "${async_runtime_headers_path}/AsyncRT/Runtime/DeviceContextCAPI.h"
 
 if [[ -z "${mojo_max_path}" ]]; then
@@ -99,16 +97,6 @@ mkdir -p "${device_root}" "${simulator_root}"
   --debug-level="${mojo_debug_level}" \
   --emit object \
   -o "${device_root}/MojoIOSCore.o"
-
-"${mojo_command[@]}" build "${coreai_source_path}" \
-  "${mojo_import_flags[@]}" \
-  --target-triple="arm64-apple-ios${deployment_target}" \
-  --target-cpu=generic \
-  --optimization-level="${optimization_level}" \
-  --debug-level="${mojo_debug_level}" \
-  --disable-warnings \
-  --emit object \
-  -o "${device_root}/MojoIOSCoreAI.o"
 
 xcrun --sdk iphoneos clang \
   -target "arm64-apple-ios${deployment_target}" \
@@ -186,16 +174,6 @@ xcrun --sdk iphoneos clang \
   --emit object \
   -o "${simulator_root}/MojoIOSCore.o"
 
-"${mojo_command[@]}" build "${coreai_source_path}" \
-  "${mojo_import_flags[@]}" \
-  --target-triple="arm64-apple-ios${deployment_target}-simulator" \
-  --target-cpu=generic \
-  --optimization-level="${optimization_level}" \
-  --debug-level="${mojo_debug_level}" \
-  --disable-warnings \
-  --emit object \
-  -o "${simulator_root}/MojoIOSCoreAI.o"
-
 xcrun --sdk iphonesimulator clang \
   -target "arm64-apple-ios${deployment_target}-simulator" \
   -O"${optimization_level}" \
@@ -270,7 +248,6 @@ rm -f -- "${device_library_path}" "${simulator_library_path}"
 
 xcrun ar rcs "${device_library_path}" \
   "${device_root}/MojoIOSCore.o" \
-  "${device_root}/MojoIOSCoreAI.o" \
   "${device_root}/KGENCompilerRTEmbedded.o" \
   "${device_root}/KGENCompilerRTAsyncRT.o" \
   "${device_root}/KGENCompilerRTGlobals.o" \
@@ -279,7 +256,6 @@ xcrun ar rcs "${device_library_path}" \
   "${device_root}/AsyncRTMetalDeviceContextCAPI.o"
 xcrun ar rcs "${simulator_library_path}" \
   "${simulator_root}/MojoIOSCore.o" \
-  "${simulator_root}/MojoIOSCoreAI.o" \
   "${simulator_root}/KGENCompilerRTEmbedded.o" \
   "${simulator_root}/KGENCompilerRTAsyncRT.o" \
   "${simulator_root}/KGENCompilerRTGlobals.o" \

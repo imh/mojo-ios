@@ -17,10 +17,6 @@ let package = Package(
         .target(
             name: "MojoIOS",
             dependencies: ["MojoIOSCore"],
-            resources: [
-                .copy("Resources/CoreAIMatmulMatmulF32.aimodel"),
-                .copy("Resources/CoreAIMVPManifest.json"),
-            ],
             linkerSettings: [
                 .linkedFramework("Foundation"),
                 .linkedFramework("Metal"),

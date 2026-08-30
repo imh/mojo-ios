@@ -40,7 +40,7 @@ ANE interface, or shipped Mojo JIT.
 | M2: CPU compiler and runtime closure | **pending** | Portable CPU language/runtime corpus is proved or explicitly rejected across the base matrix |
 | M3: standard library and production ABI | **pending** | Complete target-sensitive inventory and production ownership/error/callback contract |
 | M4: general Metal backend | **pending** | Declared Metal operation set passes A-series iPhone and M-series iPad release gates |
-| M5: upstream-shaped Core AI backend | **experimental fixed MVP** | Declared graph subset converts and executes through public iOS/iPadOS 27 APIs with scoped placement evidence |
+| M5: upstream-shaped Core AI backend | **upstream blocked; Apple probe passes** | A standard MAX graph-backend extension is available, then the declared subset converts and executes through public iOS/iPadOS 27 APIs |
 | M6: remaining general async | **upstream gated** | Every public upstream async surface is classified and its supported subset is race/lifetime gated |
 | M7: upstream and release sustainability | **pending** | Reviewable patch series, compatibility-tuple CI, signed reproducible releases |
 
@@ -128,10 +128,12 @@ physical A-series iPhone and M-series iPad lane.
 
 ## M5: upstream-shaped Core AI backend
 
-The fixed graph, AOT specialization, host execution, fixed two-matmul standard
-Mojo lowering, Swift package, and signed physical iPadOS 27 execution slices
-pass. They do not constitute a general Mojo graph backend or ANE-residency
-proof.
+Direct Apple graph authoring, AOT specialization, host execution, and signed
+physical iPadOS 27 execution pass. They prove Apple feasibility, not Mojo/MAX
+integration. The former fixed two-matmul compiler pass and private runtime ABI
+were removed: they bypassed the normal MAX graph compiler and could not grow
+into an upstream backend. Standard Core AI lowering now fails explicitly until
+the open-source MAX graph compiler/driver offers a backend extension point.
 
 1. Require a documented stable authoring interface.
 2. Select the highest generic tensor/graph IR in the ordinary Mojo/MAX pipeline.
@@ -200,5 +202,6 @@ environment variables. Do not change global `xcode-select` as part of a gate.
 - The base CPU/Metal deployment minimum is a separate unresolved policy. Core
   AI availability must not raise it implicitly.
 
-The current M1 iPad proves the useful Metal MVP and the fixed Core AI MVP on
-iPadOS 27 beta 7, and is covered by the Core AI `h13g` specialization.
+The current M1 iPad proves the useful Metal MVP and the standalone public-Core-AI
+probe on iPadOS 27 beta 7, and is covered by the Core AI `h13g`
+specialization. It does not prove Mojo-to-Core-AI lowering.

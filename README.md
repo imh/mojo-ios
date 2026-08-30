@@ -50,17 +50,15 @@ several kernels in one Mojo library, and static/dynamic threadgroup memory. The
 same lowering and embedded AsyncRT Metal runtime execute correctly against a
 Mac GPU, an M4 iPad Simulator GPU, and a physical M1 iPad Pro GPU.
 
-The Core AI preview now includes one fixed standard-Mojo vertical slice. Two
-ordinary `linalg.matmul[target="coreai"]` calls form a compiler graph region,
-lower to an ordered AsyncRT Core AI submission, and link through a public Swift
-Core AI bridge with a preserved `.aimodel` package resource. The compiler gate
-runs at O0/O3 for device and Simulator objects, and unsupported cardinality or
-shape fails by name without CPU or Metal fallback. Model authoring, eight iOS
-AOT specializations, host numerical execution, Swift device/Simulator builds,
-and an iOS 27 app package pass. The signed app also executes on a physical M1
-iPad Pro running iPadOS 27 beta 7, with exact results across repeated and eight
-simultaneous calls over ten stress rounds. Instruments placement evidence
-remains pending; no ANE residency is claimed.
+Core AI currently has a deliberately separate Apple feasibility probe, not a
+Mojo backend. Direct graph authoring, eight iOS AOT specializations, host
+numerical execution, public-Swift device builds, and physical M1 iPad execution
+pass. The probe demonstrates the public Apple toolchain and runtime only; it is
+not shipped in the Mojo XCFramework or Swift package. Standard
+`linalg.matmul[target="coreai"]` fails at compile time because the open-source
+MAX tree does not expose the graph-compiler/driver extension needed for a real
+backend. There is no fixed-graph compiler pass, project-specific runtime ABI,
+or CPU/Metal fallback.
 
 Deliberately unsupported target-sensitive calls fail during compilation with
 the operation named in the diagnostic:
@@ -174,7 +172,7 @@ See `docs/SUPPORT_CONTRACT.md` for the contract,
 `docs/ASYNC_GATE.md` for language-async architecture and evidence,
 `docs/METAL_FEASIBILITY_GATE.md` for the experimental Metal slice,
 `docs/COREAI_FEASIBILITY_GATE.md` for the experimental Core AI slice,
-`docs/COREAI_MVP_GATE.md` for the fixed standard-Mojo vertical slice,
+`docs/COREAI_MVP_GATE.md` for the standard-backend architectural gate,
 `docs/CAPABILITY_LEDGER.md` for the canonical gap inventory, and
 `docs/ARBITRARY_AOT_MOJO_PLAN.md` for the canonical end-to-end plan,
 `docs/APP_STORE_DISTRIBUTION_GATE.md` for the release evidence ladder, and

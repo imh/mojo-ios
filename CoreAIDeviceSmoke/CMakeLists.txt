@@ -8,23 +8,15 @@ endif()
 
 set(mojo_ios_project_root "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(mojo_ios_coreai_asset
-    "${mojo_ios_project_root}/Sources/MojoIOS/Resources/CoreAIMatmulMatmulF32.aimodel")
-set(mojo_ios_core_library
-    "${mojo_ios_project_root}/build/iphoneos/libMojoIOSCore.a")
+    "${mojo_ios_project_root}/build/coreai-mvp/CoreAIMatmulMatmulF32.aimodel")
 
 if(NOT IS_DIRECTORY "${mojo_ios_coreai_asset}")
   message(FATAL_ERROR
           "Missing Core AI asset; run build-coreai-mvp-resources first: ${mojo_ios_coreai_asset}")
 endif()
-if(NOT EXISTS "${mojo_ios_core_library}")
-  message(FATAL_ERROR
-          "Missing Mojo XCFramework library; run build-source-core first: ${mojo_ios_core_library}")
-endif()
-
 add_executable(
   MojoIOSCoreAIDeviceSmoke MACOSX_BUNDLE
   CoreAIDeviceSmokeApp.swift
-  "${mojo_ios_project_root}/Sources/MojoIOS/CoreAIRuntime.swift"
   "${mojo_ios_coreai_asset}"
 )
 
@@ -36,10 +28,8 @@ set_source_files_properties(
 target_link_libraries(
   MojoIOSCoreAIDeviceSmoke
   PRIVATE
-    "${mojo_ios_core_library}"
     "-framework CoreAI"
     "-framework Foundation"
-    "-framework Metal"
     "-framework UIKit"
 )
 

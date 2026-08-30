@@ -99,7 +99,7 @@ and names so they cannot be packaged accidentally.
 
 Generate an inventory of every system API reached transitively by the Mojo
 standard library, MAX library, Apple runtime, Swift wrapper, Metal runtime, and
-Core AI wrapper.
+any future standard Core AI backend runtime.
 
 For every Required Reason API category:
 

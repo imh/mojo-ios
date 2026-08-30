@@ -4,7 +4,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_bundle="${project_root}/build/CoreAIDeviceSmoke/Debug-iphoneos/MojoIOSCoreAIDeviceSmoke.app"
 bundle_identifier="com.ianhorn.mojoios.coreai.devicesmoke"
-expected_marker="MOJO_IOS_COREAI_DEVICE_SMOKE_PASS source=standard-mojo graph=matmul-matmul calls=sequential-concurrent concurrent_rounds=10 fallback=none ane=preferred"
+expected_marker="MOJO_IOS_COREAI_DEVICE_SMOKE_PASS source=direct-swift-probe graph=matmul-matmul calls=sequential-concurrent concurrent_rounds=10 mojo_backend=not-implemented fallback=none ane=preferred"
 device_result_path="${project_root}/build/CoreAIDeviceSmoke/CoreAIDeviceSmokeResult.txt"
 
 : "${MOJO_IOS_COREAI_DEVELOPER_DIR:?Set MOJO_IOS_COREAI_DEVELOPER_DIR to the Xcode 27 Contents/Developer directory}"

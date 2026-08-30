@@ -16,99 +16,6 @@ enum {
   ASYNCRT_CPU_PARALLELISM_ATTRIBUTE = 1000,
 };
 
-typedef void (*AsyncRTCoreAITestCompletion)(void *request,
-                                            const char *error_message);
-
-typedef struct {
-  const float *input;
-  const float *first_weights;
-  const float *second_weights;
-  float *output;
-  void *request;
-  AsyncRTCoreAITestCompletion completion;
-} AsyncRTCoreAITestRequest;
-
-static _Atomic(uint32_t) asyncrt_coreai_active_request_count = 0;
-static _Atomic(uint32_t) asyncrt_coreai_peak_request_count = 0;
-
-static void *asyncrt_test_coreai_execute(void *untyped_request) {
-  AsyncRTCoreAITestRequest *request = untyped_request;
-  assert(request != NULL);
-  uint32_t active_count = atomic_fetch_add_explicit(
-                              &asyncrt_coreai_active_request_count, 1,
-                              memory_order_acq_rel) +
-                          1;
-  uint32_t peak_count = atomic_load_explicit(
-      &asyncrt_coreai_peak_request_count, memory_order_acquire);
-  while (peak_count < active_count &&
-         !atomic_compare_exchange_weak_explicit(
-             &asyncrt_coreai_peak_request_count, &peak_count, active_count,
-             memory_order_acq_rel, memory_order_acquire)) {
-  }
-
-  if (request->input[0] == -999.0f) {
-    request->completion(request->request,
-                        "simulated public Core AI runtime failure");
-  } else {
-    float intermediate[8] = {0};
-    for (size_t row = 0; row < 2; ++row) {
-      for (size_t column = 0; column < 4; ++column) {
-        for (size_t reduction = 0; reduction < 3; ++reduction) {
-          intermediate[row * 4 + column] +=
-              request->input[row * 3 + reduction] *
-              request->first_weights[reduction * 4 + column];
-        }
-      }
-    }
-    for (size_t row = 0; row < 2; ++row) {
-      for (size_t column = 0; column < 2; ++column) {
-        request->output[row * 2 + column] = 0;
-        for (size_t reduction = 0; reduction < 4; ++reduction) {
-          request->output[row * 2 + column] +=
-              intermediate[row * 4 + reduction] *
-              request->second_weights[reduction * 2 + column];
-        }
-      }
-    }
-    request->completion(request->request, NULL);
-  }
-
-  uint32_t previous_active_count = atomic_fetch_sub_explicit(
-      &asyncrt_coreai_active_request_count, 1, memory_order_acq_rel);
-  assert(previous_active_count > 0);
-  free(request);
-  return NULL;
-}
-
-void MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2(
-    const float *input, const float *first_weights,
-    const float *second_weights, float *output, void *request,
-    AsyncRTCoreAITestCompletion completion) {
-  assert(input != NULL);
-  assert(first_weights != NULL);
-  assert(second_weights != NULL);
-  assert(output != NULL);
-  assert(request != NULL);
-  assert(completion != NULL);
-
-  AsyncRTCoreAITestRequest *test_request = malloc(sizeof(*test_request));
-  assert(test_request != NULL);
-  *test_request = (AsyncRTCoreAITestRequest){
-      .input = input,
-      .first_weights = first_weights,
-      .second_weights = second_weights,
-      .output = output,
-      .request = request,
-      .completion = completion,
-  };
-  pthread_t worker;
-  int create_result =
-      pthread_create(&worker, NULL, asyncrt_test_coreai_execute, test_request);
-  assert(create_result == 0);
-  int detach_result = pthread_detach(worker);
-  assert(detach_result == 0);
-}
-
 uint32_t KGEN_CompilerRT_AsyncRT_ParallelismLevel(void);
 typedef struct {
   void *pointer;
@@ -333,46 +240,8 @@ static void asyncrt_test_coreai_device_context(void) {
   AsyncRT_DeviceContext_strfree(error_message);
   assert(function == NULL);
 
-  const float first_weights[12] = {
-      1, 0, 0, 1,
-      0, 1, 1, 0,
-      1, 1, 0, 0,
-  };
-  const float second_weights[8] = {
-      1, 0,
-      0, 1,
-      1, 0,
-      0, 1,
-  };
-  float first_output[4] = {0};
-  float second_output[4] = {0};
-  error_message = AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2(
-      context, input, first_weights, second_weights, first_output);
-  assert(error_message == NULL);
-  error_message = AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2(
-      context, input, first_weights, second_weights, second_output);
-  assert(error_message == NULL);
   error_message = AsyncRT_DeviceContext_synchronize(context);
   assert(error_message == NULL);
-  const float expected_output[4] = {6, 6, 15, 15};
-  assert(memcmp(first_output, expected_output, sizeof(expected_output)) == 0);
-  assert(memcmp(second_output, expected_output, sizeof(expected_output)) == 0);
-  assert(atomic_load_explicit(&asyncrt_coreai_peak_request_count,
-                              memory_order_acquire) == 1 &&
-         "one Core AI context must preserve submission order");
-
-  const float failing_input[6] = {-999, 0, 0, 0, 0, 0};
-  error_message = AsyncRT_CoreAI_executeMatmulMatmulF32_2x3x4x2(
-      context, failing_input, first_weights, second_weights, first_output);
-  assert(error_message == NULL);
-  error_message = AsyncRT_DeviceContext_synchronize(context);
-  assert(error_message != NULL);
-  assert(strcmp(error_message, "simulated public Core AI runtime failure") ==
-         0);
-  AsyncRT_DeviceContext_strfree(error_message);
-
-  error_message = AsyncRT_DeviceContext_synchronize(context);
-  assert(error_message == NULL && "Core AI context errors are consumed once");
   AsyncRT_DeviceContext_release(context);
 }
 
@@ -449,7 +318,7 @@ int main(void) {
 
   AsyncRT_DeviceContext_release(context);
   puts("MOJO_IOS_ASYNCRT_HOST_PASS language_async=execute-chain-andthen-timeout "
-       "coreai_context=ordered-buffered-errors "
+       "coreai_context=buffer-only-no-graph-submission "
        "device_context_tasks=64 destroyed_coroutines=64 "
        "peak_concurrency_gt=1");
   return 0;

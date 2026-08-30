@@ -3,7 +3,7 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_directory="${project_root}/build/CoreAIDeviceSmoke"
-coreai_asset="${project_root}/Sources/MojoIOS/Resources/CoreAIMatmulMatmulF32.aimodel"
+coreai_asset="${project_root}/build/coreai-mvp/CoreAIMatmulMatmulF32.aimodel"
 
 : "${MOJO_IOS_COREAI_DEVELOPER_DIR:?Set MOJO_IOS_COREAI_DEVELOPER_DIR to the Xcode 27 Contents/Developer directory}"
 
@@ -69,7 +69,10 @@ rg -Fq "/System/Library/Frameworks/CoreAI.framework/CoreAI" \
 global_symbols="$(
   nm -g "${app_bundle}/MojoIOSCoreAIDeviceSmoke"
 )"
-rg -Fq '_MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2' \
-  <<<"${global_symbols}"
+if rg -q 'mojo_ios_coreai|MojoIOSCoreAI|AsyncRT_CoreAI' \
+  <<<"${global_symbols}"; then
+  echo "project-specific Mojo/Core AI ABI leaked into direct Apple probe" >&2
+  exit 1
+fi
 
-echo "COREAI_DEVICE_APP_BUILD_PASS deployment=ios27 source=standard-mojo resource=aimodel fallback=none signed=$([[ -n "${MOJO_IOS_DEVELOPMENT_TEAM:-}" ]] && echo yes || echo no)"
+echo "COREAI_DEVICE_APP_BUILD_PASS deployment=ios27 source=direct-swift-probe resource=aimodel mojo_backend=not-implemented fallback=none signed=$([[ -n "${MOJO_IOS_DEVELOPMENT_TEAM:-}" ]] && echo yes || echo no)"

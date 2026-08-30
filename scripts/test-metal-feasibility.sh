@@ -8,7 +8,7 @@ stdlib_path="${upstream_root}/mojo/stdlib"
 max_path="${upstream_root}/max/mojo"
 probe_path="${project_root}/probes/IOSMetalVectorAddProbe.mojo"
 harness_path="${project_root}/tests/MetalHostVectorAddSmoke.c"
-coreai_unavailable_bridge_source="${project_root}/tests/CoreAIUnavailableBridge.c"
+target_contract_probe_path="${project_root}/probes/IOSMetalTargetContractProbe.mojo"
 output_root="${project_root}/build/metal-gate"
 compiler_state_root="${MOJO_IOS_METAL_COMPILER_STATE_ROOT:-${project_root}/build/compiler-state/metal}"
 device_context_source="${upstream_root}/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c"
@@ -49,7 +49,7 @@ test -d "${stdlib_path}/std"
 test -d "${max_path}/max"
 test -f "${probe_path}"
 test -f "${harness_path}"
-test -f "${coreai_unavailable_bridge_source}"
+test -f "${target_contract_probe_path}"
 test -f "${device_context_source}"
 test -f "${apple_work_queue_source}"
 test -f "${metal_context_source}"
@@ -67,14 +67,15 @@ compiler_command=(
 
 compile_mojo_probe() {
   local target_triple="$1"
-  local output_path="$2"
+  local target_arch="$2"
+  local output_path="$3"
   "${compiler_command[@]}" build "${probe_path}" \
     -I "${stdlib_path}" \
     -I "${max_path}" \
     --emit object \
     --target-triple "${target_triple}" \
-    --target-cpu apple-m4 \
-    --target-accelerator apple-m4 \
+    --target-cpu "${target_arch}" \
+    --target-accelerator "${target_arch}" \
     --optimization-level 3 \
     -o "${output_path}"
   local metal_library_count
@@ -86,6 +87,18 @@ compile_mojo_probe() {
       "${metal_library_count}" >&2
     exit 1
   fi
+}
+
+compile_target_contract() {
+  local target_triple="$1"
+  local output_path="$2"
+  "${compiler_command[@]}" build "${target_contract_probe_path}" \
+    -I "${stdlib_path}" \
+    --emit object \
+    --target-triple "${target_triple}" \
+    --target-cpu apple-m1 \
+    --optimization-level 3 \
+    -o "${output_path}"
 }
 
 compile_runtime_variant() {
@@ -122,13 +135,11 @@ compile_runtime_variant() {
     -std=c17 -O3 -Wall -Wextra -Werror \
     -c "${globals_source}" \
     -o "${output_root}/Globals-${variant_name}.o"
-  xcrun --sdk "${sdk_name}" clang -target "${target_triple}" \
-    -std=c17 -O3 -Wall -Wextra -Werror \
-    -c "${coreai_unavailable_bridge_source}" \
-    -o "${output_root}/CoreAIUnavailableBridge-${variant_name}.o"
 }
 
-compile_mojo_probe arm64-apple-ios15.0 \
+compile_target_contract arm64-apple-ios15.0 \
+  "${output_root}/IOSMetalTargetContract.o"
+compile_mojo_probe arm64-apple-ios15.0 apple-m1 \
   "${output_root}/IOSMetalVectorAddProbe.o"
 compile_runtime_variant iphoneos iphoneos arm64-apple-ios15.0
 xcrun --sdk iphoneos clang -target arm64-apple-ios15.0 -dynamiclib \
@@ -140,7 +151,6 @@ xcrun --sdk iphoneos clang -target arm64-apple-ios15.0 -dynamiclib \
   "${output_root}/CompilerRT-iphoneos.o" \
   "${output_root}/KGENAsyncRT-iphoneos.o" \
   "${output_root}/Globals-iphoneos.o" \
-  "${output_root}/CoreAIUnavailableBridge-iphoneos.o" \
   -framework Foundation -framework Metal \
   -o "${output_root}/IOSMetalVectorAddProbe.dylib"
 if nm -u "${output_root}/IOSMetalVectorAddProbe.dylib" | rg -q AsyncRT_; then
@@ -148,7 +158,9 @@ if nm -u "${output_root}/IOSMetalVectorAddProbe.dylib" | rg -q AsyncRT_; then
   exit 1
 fi
 
-compile_mojo_probe arm64-apple-ios15.0-simulator \
+compile_target_contract arm64-apple-ios15.0-simulator \
+  "${output_root}/IOSMetalTargetContract-simulator.o"
+compile_mojo_probe arm64-apple-ios15.0-simulator apple-m1 \
   "${output_root}/IOSMetalVectorAddProbe-simulator.o"
 compile_runtime_variant iphonesimulator iphonesimulator \
   arm64-apple-ios15.0-simulator
@@ -164,7 +176,6 @@ xcrun --sdk iphonesimulator clang -target arm64-apple-ios15.0-simulator \
   "${output_root}/CompilerRT-iphonesimulator.o" \
   "${output_root}/KGENAsyncRT-iphonesimulator.o" \
   "${output_root}/Globals-iphonesimulator.o" \
-  "${output_root}/CoreAIUnavailableBridge-iphonesimulator.o" \
   "${output_root}/MetalVectorAddSmoke-simulator-harness.o" \
   -framework Foundation -framework Metal \
   -o "${output_root}/MetalVectorAddSmoke-simulator"
@@ -175,7 +186,9 @@ else
   echo "set MOJO_IOS_METAL_SIMULATOR_ID to execute the linked Metal probe in a booted simulator"
 fi
 
-compile_mojo_probe arm64-apple-macosx15.0 \
+compile_target_contract arm64-apple-macosx15.0 \
+  "${output_root}/MetalTargetContract-macos.o"
+compile_mojo_probe arm64-apple-macosx15.0 apple-m1 \
   "${output_root}/MetalVectorAddProbe-macos.o"
 compile_runtime_variant macos macosx arm64-apple-macosx15.0
 xcrun --sdk macosx clang -target arm64-apple-macosx15.0 \
@@ -189,10 +202,9 @@ xcrun --sdk macosx clang -target arm64-apple-macosx15.0 \
   "${output_root}/CompilerRT-macos.o" \
   "${output_root}/KGENAsyncRT-macos.o" \
   "${output_root}/Globals-macos.o" \
-  "${output_root}/CoreAIUnavailableBridge-macos.o" \
   "${output_root}/MetalHostVectorAddSmoke.o" \
   -framework Foundation -framework Metal \
   -o "${output_root}/MetalHostVectorAddSmoke"
 "${output_root}/MetalHostVectorAddSmoke"
 
-echo "verified the useful Mojo Metal MVP on iOS linkage, iPad Simulator, and macOS GPU execution"
+echo "verified all M1-M5 Metal target triples plus the useful Mojo Metal MVP on iOS linkage, iPad Simulator, and macOS GPU execution"

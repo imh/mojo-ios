@@ -94,8 +94,8 @@ The current repository proves useful but deliberately narrow slices:
 - ordinary language async, suspension/resumption, results, and raised errors;
 - a useful Metal MVP with scalar captures, 3D dispatch, multiple kernels, and
   static and dynamic threadgroup memory;
-- a fixed Core AI graph feasibility slice with AOT artifacts and public Swift
-  device compile/link.
+- a fixed direct Core AI graph feasibility slice with AOT artifacts and public
+  Swift device compile/link, explicitly separate from Mojo/MAX integration.
 
 These are scoped proofs, not whole-category claims. In particular, the current
 symbol gate covers the runtime symbols used by the probes rather than the

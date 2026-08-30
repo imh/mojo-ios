@@ -16,11 +16,6 @@ int64_t mojo_ios_async_await_sum(int64_t left, int64_t right);
 int64_t mojo_ios_async_parallel_sum(int64_t left, int64_t right);
 int32_t mojo_ios_async_error_status(int32_t should_raise);
 void mojo_ios_print_diagnostic(void);
-int32_t mojo_ios_coreai_matmul_matmul_f32(float *input,
-                                          float *first_weights,
-                                          float *second_weights,
-                                          float *output);
-
 #ifdef __cplusplus
 }
 #endif
