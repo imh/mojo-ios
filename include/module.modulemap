@@ -1,0 +1,4 @@
+module MojoIOSCore {
+  header "MojoIOSCore.h"
+  export *
+}

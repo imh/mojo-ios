@@ -1,0 +1,37 @@
+[workspace]
+authors = ["Ian Horn <horn.imh@gmail.com>"]
+channels = ["https://conda.modular.com/max", "conda-forge"]
+name = "mojo-ios"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+build-source-core = "./scripts/build-source-core-xcframework.sh"
+verify-core = "./scripts/verify-core-artifacts.sh"
+build-swift-smoke = "./scripts/build-swift-smoke.sh"
+test-swift-simulators = "./scripts/test-swift-simulators.sh"
+build-device-smoke = "./scripts/build-device-smoke.sh"
+test-swift-device = "./scripts/test-swift-device.sh"
+test-asyncrt-host = "./scripts/test-asyncrt-host.sh"
+test-asyncrt-tsan = "./scripts/test-asyncrt-tsan.sh"
+test-language-async = "./scripts/test-language-async-lowering.sh"
+test-compilerrt-host = "./scripts/test-compilerrt-host.sh"
+test-compilerrt-tsan = "./scripts/test-compilerrt-tsan.sh"
+test-unsupported-ios-targets = "./scripts/test-source-target-policy.sh"
+test-supported-runtime-surface = "./scripts/test-source-runtime-surface.sh"
+test-upstream-runtime-build = "./scripts/test-upstream-runtime-build.sh"
+checkout-upstream = "./scripts/checkout-upstream.sh"
+build-upstream-compiler = "./scripts/build-upstream-compiler.sh"
+test-source-compiler-host = "./scripts/test-source-compiler-host.sh"
+test-upstream-parallelize-lowering = "./scripts/test-upstream-parallelize-lowering.sh"
+test-metal-feasibility = "./scripts/test-metal-feasibility.sh"
+test-metal-device = "./scripts/test-metal-device.sh"
+bootstrap-coreai-authoring = "./scripts/bootstrap-coreai-authoring.sh"
+test-coreai-feasibility = "./scripts/test-coreai-feasibility.sh"
+test-coreai-target-contract = "./scripts/test-coreai-target-contract.sh"
+build-coreai-mvp-resources = "./scripts/build-coreai-mvp-resources.sh"
+build-coreai-device-smoke = "./scripts/build-coreai-device-smoke.sh"
+test-coreai-device = "./scripts/test-coreai-device.sh"
+
+[dependencies]
+mojo = ">=1.0.0,<2"

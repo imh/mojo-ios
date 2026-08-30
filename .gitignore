@@ -1,0 +1,13 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# Derived compiler and Apple-platform artifacts
+.work/
+build/
+.build/
+.swiftpm/
+DerivedData/
+*.xcresult
+__pycache__/
+*.pyc

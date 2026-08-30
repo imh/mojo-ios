@@ -1,0 +1,63 @@
+{
+  "compiler_runtime_operation": "AsyncRT_CoreAI_enqueueMatmulMatmulF32_2x3x4x2",
+  "fallback": "none",
+  "files": [
+    {
+      "path": "main.hash",
+      "sha256": "e9fdfbe14b8e0f7acac72734fc650b28f8d3dbabb9a957fdc84e16edeb5d58cf"
+    },
+    {
+      "path": "main.mlirb",
+      "sha256": "b0755a00f0a4f9fbc3095986a2f063332085c16b6596b15b4262ae1b3dab811b"
+    },
+    {
+      "path": "metadata.json",
+      "sha256": "ccbd819286f10e80a9c537af94a38cf692eb4ef33702f728aa4af4d3bf4c83f2"
+    }
+  ],
+  "format_version": 1,
+  "inputs": {
+    "first_weights": {
+      "dtype": "float32",
+      "shape": [
+        3,
+        4
+      ]
+    },
+    "input_values": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        3
+      ]
+    },
+    "second_weights": {
+      "dtype": "float32",
+      "shape": [
+        4,
+        2
+      ]
+    }
+  },
+  "minimum_os": "iOS/iPadOS 27.0",
+  "outputs": {
+    "result": {
+      "dtype": "float32",
+      "shape": [
+        2,
+        2
+      ]
+    }
+  },
+  "placement_contract": "submitted-to-coreai-neural-engine-preferred",
+  "region": "matmul_matmul_f32_2x3x4x2",
+  "runtime_resource": "CoreAIMatmulMatmulF32.aimodel",
+  "swift_execution_symbol": "MojoIOSCoreAI_executeMatmulMatmulF32_2x3x4x2",
+  "toolchain": {
+    "compiler_revision": "1c9fd2e03331f77d3a1034127cb3700b7fa43c02",
+    "coreai_authoring_version": "1.0.0b2",
+    "coreai_build_version": "coreai-build 3600.83.1",
+    "xcode_build": "27A5252f",
+    "xcode_version": "27.0"
+  }
+}
