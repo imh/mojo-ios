@@ -13,6 +13,9 @@ an iOS special case look complete by introducing a parallel abstraction.
 
 ## Architecture requirements
 
+- Never infer Metal is absent from `xcrun metal` or a sandboxed Xcode failure;
+  query the selected Xcode with `xcodebuild -showComponent MetalToolchain -json`
+  and probe the `toolchainSearchPath` frontend directly.
 - Preserve standard Mojo and MAX syntax and semantics.
 - Fix generic lowering when the failure is generic; otherwise fill the normal
   target/backend/runtime extension point already used by peer targets.
