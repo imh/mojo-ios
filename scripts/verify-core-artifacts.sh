@@ -6,6 +6,11 @@ build_root="${project_root}/build"
 device_library="${build_root}/iphoneos/libMojoIOSCore.a"
 simulator_library="${build_root}/iphonesimulator/libMojoIOSCore.a"
 xcframework_path="${build_root}/MojoIOSCore.xcframework"
+distribution_policy_path="${project_root}/config/distribution/current-xcframework-audit-policy.json"
+distribution_report_path="${build_root}/distribution-evidence/xcframework-audit.json"
+deployment_target="${MOJO_IOS_DEPLOYMENT_TARGET:-15.0}"
+optimization_level="${MOJO_IOS_OPTIMIZATION_LEVEL:-3}"
+upstream_revision="$(tr -d '[:space:]' < "${project_root}/upstream/REVISION")"
 
 test -f "${device_library}"
 test -f "${simulator_library}"
@@ -111,4 +116,12 @@ test "${simulator_metal_runtime_platform}" = "7"
 variant_count="$(/usr/libexec/PlistBuddy -c 'Print :AvailableLibraries' "${xcframework_path}/Info.plist" | grep -c 'Dict')"
 test "${variant_count}" = "2"
 
-echo "verified device platform=2, simulator platform=7, core/async exports, language AsyncRT, CPU/Metal runtime, no test controls, and no project-specific Core AI graph ABI"
+python3 "${project_root}/scripts/audit-apple-distribution.py" \
+  "${xcframework_path}" \
+  --policy "${distribution_policy_path}" \
+  --output "${distribution_report_path}" \
+  --provenance "deployment_target=${deployment_target}" \
+  --provenance "optimization_level=${optimization_level}" \
+  --provenance "upstream_revision=${upstream_revision}"
+
+echo "verified device platform=2, simulator platform=7, core/async exports, language AsyncRT, CPU/Metal runtime, no test controls, no project-specific Core AI graph ABI, and deterministic distribution inventory"

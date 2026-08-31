@@ -36,6 +36,15 @@ preview evidence only. It does not satisfy the stable App Store release gate.
 The two lanes may share source and package architecture, but they never share a
 release status implicitly.
 
+## Current partial evidence
+
+`pixi run test-distribution-audit` rebuilds the current feasibility
+XCFramework, emits a deterministic JSON file and static-archive-member
+inventory under `build/distribution-evidence/`, and runs named corruption
+fixtures. This is reusable machinery for Gates A and B, but it audits the
+XCFramework rather than the complete signed application archive. It therefore
+does not complete either gate or advance the archive validation ladder.
+
 ## Gate A: AOT and forbidden-content audit
 
 The final app archive must contain no:

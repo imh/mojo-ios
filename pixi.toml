@@ -8,6 +8,7 @@ version = "0.1.0"
 [tasks]
 build-source-core = "./scripts/build-source-core-xcframework.sh"
 verify-core = "./scripts/verify-core-artifacts.sh"
+test-distribution-audit = "./scripts/test-distribution-audit.sh"
 build-swift-smoke = "./scripts/build-swift-smoke.sh"
 test-swift-simulators = "./scripts/test-swift-simulators.sh"
 build-device-smoke = "./scripts/build-device-smoke.sh"

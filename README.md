@@ -133,9 +133,16 @@ pixi run test-compilerrt-tsan
 pixi run test-asyncrt-tsan
 pixi run build-source-core
 pixi run verify-core
+pixi run test-distribution-audit
 pixi run build-swift-smoke
 pixi run test-swift-simulators
 ```
+
+`test-distribution-audit` rebuilds the current device/Simulator XCFramework,
+emits deterministic evidence under `build/distribution-evidence/`, and proves
+the local policy rejects corrupted content, symbols, target metadata, slices,
+and dependencies. It is an XCFramework gate, not a signed-app-archive or App
+Store validation claim.
 
 The Core AI gate uses Xcode 27 side by side and leaves global `xcode-select`
 unchanged:
