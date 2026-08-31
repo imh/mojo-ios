@@ -32,6 +32,7 @@ test-coreai-target-contract = "./scripts/test-coreai-target-contract.sh"
 build-coreai-mvp-resources = "./scripts/build-coreai-mvp-resources.sh"
 build-coreai-device-smoke = "./scripts/build-coreai-device-smoke.sh"
 test-coreai-device = "./scripts/test-coreai-device.sh"
+verify-tracker = "./scripts/verify-tracker-structure.sh"
 
 [dependencies]
 mojo = ">=1.0.0,<2"

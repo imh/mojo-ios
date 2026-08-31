@@ -51,8 +51,9 @@ must not be inferred from a nearby item.
   fixed-shape direct-authoring/AOT/public-Swift feasibility slice passes with
   Xcode 27, including physical iPadOS 27 execution, but it is deliberately not
   linked to Mojo. The open-source MAX graph compiler/driver has no backend
-  extension point for Core AI, so standard Mojo lowering fails explicitly and
-  no Core AI resource is part of the supported package.
+  extension point for Core AI, so this project does not register a source-level
+  Core AI target. Runtime-selected Core AI context creation fails explicitly,
+  and no Core AI resource is part of the supported package.
 - ANE-only execution. Core AI can prefer ANE but currently cannot require it or
   report per-operation residency. Private ANE compiler/runtime APIs are not an
   acceptable substitute.
@@ -67,7 +68,6 @@ must not be inferred from a nearby item.
   by the current probes.
 - Production ownership, error, callback, allocator, and multi-library
   composition rules beyond the current fixed-width scalar and buffer sample.
-- A release runtime archive built separately from all test-only AsyncRT hooks.
 - App Store archive validation, privacy-manifest closure, signed XCFramework
   provenance, TestFlight acceptance, or App Review acceptance.
 

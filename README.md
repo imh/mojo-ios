@@ -12,6 +12,9 @@ canonical completion plan is
 scoped status in [docs/CAPABILITY_LEDGER.md](docs/CAPABILITY_LEDGER.md) and the
 distribution evidence ladder in
 [docs/APP_STORE_DISTRIBUTION_GATE.md](docs/APP_STORE_DISTRIBUTION_GATE.md).
+The ledger is a progressive-disclosure tracker: every subsystem contains
+current items, delegates to a deeper tracker, or explicitly says that its
+remaining surface is not decomposed and therefore not claimed.
 
 The architecture deliberately keeps platform knowledge out of application
 Mojo. Library authors use the normal APIs:
@@ -106,6 +109,7 @@ does not add an iOS Mojo API.
 On a fresh checkout:
 
 ```sh
+pixi run verify-tracker
 pixi run checkout-upstream
 pixi run build-upstream-compiler
 pixi run test-source-compiler-host

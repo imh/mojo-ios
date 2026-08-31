@@ -50,8 +50,9 @@ Work in order:
 
 1. Add `tracking/capabilities.toml`, `tracking/targets.toml`, and
    `tracking/gates.toml` together with a validator.
-2. Split umbrella rows such as `cpu.language-core`, `runtime.apple-embedded`,
-   and `abi.swift-c` into atomic, target-scoped capabilities.
+2. Give every umbrella row concrete children, a delegated tracker, or an
+   explicit `not decomposed yet` remainder. Split the active/proved portion
+   into atomic, target-scoped capabilities as work reaches it.
 3. Import every present positive test, negative diagnostic, toolchain
    prerequisite, and hardware result.
 4. Generate the capability ledger, gap report, target evidence matrix, support

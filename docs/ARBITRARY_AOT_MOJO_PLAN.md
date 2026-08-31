@@ -99,9 +99,9 @@ The current repository proves useful but deliberately narrow slices:
 
 These are scoped proofs, not whole-category claims. In particular, the current
 symbol gate covers the runtime symbols used by the probes rather than the
-complete upstream runtime ABI, and the current build includes test
-instrumentation in runtime objects. The release artifact must separate those
-concerns.
+complete upstream runtime ABI. Shipped runtime archives now exclude test-only
+AsyncRT controls, while instrumented host and sanitizer products remain
+separate.
 
 ## Gap workstreams
 
@@ -139,11 +139,12 @@ Mojo library without duplicate runtime ownership.
 Release runtime objects must be built without testing hooks. Instrumented
 runtime objects remain a separate test-only artifact.
 
-### 3. Standard library and native dependencies
+### 3. Standard library, standard MAX, and native dependencies
 
-Generate a source inventory of every target-sensitive standard-library and MAX
-surface, including indirect libc calls and host-only native dependencies. Give
-each operation exactly one disposition:
+Maintain separate progressively expanded inventories for target-sensitive
+standard-library surfaces and standard MAX Mojo/graph/device surfaces,
+including indirect libc calls and host-only native dependencies. Give each
+reached operation exactly one disposition:
 
 1. normal Darwin implementation;
 2. operation-specific compile-time rejection; or
@@ -154,6 +155,12 @@ files, paths, environment, process, dynamic loading, networking, locale and
 Unicode, diagnostics, reflection, compile-time facilities, Python, and
 accelerator host APIs. Audit every implemented system call for deployment
 availability, sandbox behavior, and Required Reason API consequences.
+
+The MAX branch begins with `max.algorithm.parallelize`, the backend-specific
+Metal and Core AI branches, and an explicit `not decomposed yet` remainder for
+all other public MAX libraries, algorithms, tensor/graph operations, device
+selection, and runtime behavior. Unpack only the branch reached by current
+work; do not infer broad MAX support from a neighboring passing operation.
 
 ### 4. Swift/C ABI and library composition
 
@@ -281,6 +288,21 @@ must not raise the base CPU/Metal minimum silently.
 
 ## Tracking model
 
+Tracking is a recursive progressive-disclosure hierarchy, not a requirement to
+flatten every future Mojo and MAX surface into one manifest immediately. The
+root must cover the whole objective at a reasonable subsystem boundary. Every
+part of a node's scope is then accounted for by one of the following:
+
+1. contains concrete child items;
+2. delegates to a deeper tracker that follows the same rule; or
+3. says **not decomposed yet**, which is an explicit no-support claim for the
+   undecomposed remainder.
+
+Nodes may mix proved or actionable children with a `not decomposed yet`
+remainder. As work reaches a node, unpack only that node. Every deeper tracker
+must have one canonical parent, so nothing can disappear into an orphan plan
+or become a second status source.
+
 Milestone M0 introduces three TOML sources that Python can read with the
 standard-library `tomllib` module:
 
@@ -294,9 +316,9 @@ Do not create these as an unvalidated duplicate of the Markdown ledger. M0 is
 complete only when the validator and generated views land in the same change.
 Until then, [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) remains canonical.
 
-Each atomic capability records:
+Each actionable leaf records:
 
-- stable ID and user-visible surface;
+- stable ID, parent node, and user-visible surface;
 - the normal lowering/runtime path;
 - disposition: `supported`, `rejected`, or `planned`;
 - maturity: `specified`, `implemented`, `host_verified`, `sim_verified`,
@@ -308,15 +330,22 @@ Each atomic capability records:
 - App Store/privacy consequences; and
 - upstream patch, issue, or commit ownership.
 
+Every non-leaf records its stable scope and its child items, delegated tracker,
+or explicit `not decomposed yet` remainder. The validator does not require an
+exhaustive leaf inventory on day one; it requires complete root coverage and
+honest disposition at every level currently exposed.
+
 The validator must fail when:
 
 1. a document, issue, or gate refers to an unknown capability ID;
-2. a supported capability lacks its required evidence;
-3. a rejected target-known capability lacks a compile-fail diagnostic;
-4. a planned backend operation can silently fall back;
-5. a required target or hardware lane is absent;
-6. evidence was produced with a mismatched compatibility tuple; or
-7. a generated view differs from the manifest.
+2. a tracker node has neither children, a valid delegation, nor an explicit
+   `not decomposed yet` disposition;
+3. a supported capability lacks its required evidence;
+4. a rejected target-known capability lacks a compile-fail diagnostic;
+5. a planned backend operation can silently fall back;
+6. a required target or hardware lane is absent;
+7. evidence was produced with a mismatched compatibility tuple; or
+8. a generated view differs from the manifest.
 
 Generated views replace duplicated hand-maintained status prose:
 
@@ -334,7 +363,9 @@ capability is supported.
 ### M0: truthful tracking foundation
 
 - Add and validate the three tracking manifests.
-- Split umbrella capabilities into atomic promises.
+- Give every umbrella node concrete children, a delegated tracker, or an
+  explicit `not decomposed yet` remainder; split active nodes into atomic
+  promises only as far as current implementation and evidence require.
 - Import every current positive and negative probe.
 - Generate the ledger, gap report, evidence matrix, and support contract.
 - Require capability IDs in all gate output.
@@ -344,7 +375,6 @@ and no current capability is lost during migration.
 
 ### M1: stable distribution gate
 
-- Add a release runtime build without testing hooks.
 - Build a signed CPU/Metal reference archive with the stable Xcode toolchain.
 - Add forbidden-content, public-API, privacy, architecture, signing, license,
   and dependency audits.
