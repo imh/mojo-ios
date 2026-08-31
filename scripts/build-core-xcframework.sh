@@ -126,7 +126,6 @@ xcrun --sdk iphoneos clang \
   -Wall \
   -Wextra \
   -Werror \
-  -DASYNCRT_ENABLE_TESTING=1 \
   -c "${apple_work_queue_source_path}" \
   -o "${device_root}/AsyncRTAppleWorkQueue.o"
 
@@ -148,7 +147,6 @@ xcrun --sdk iphoneos clang \
   -Wextra \
   -Werror \
   -DASYNCRT_ENABLE_METAL=1 \
-  -DASYNCRT_ENABLE_TESTING=1 \
   -I "${async_runtime_headers_path}" \
   -c "${async_runtime_source_path}" \
   -o "${device_root}/AsyncRTDeviceContextCAPI.o"
@@ -202,7 +200,6 @@ xcrun --sdk iphonesimulator clang \
   -Wall \
   -Wextra \
   -Werror \
-  -DASYNCRT_ENABLE_TESTING=1 \
   -c "${apple_work_queue_source_path}" \
   -o "${simulator_root}/AsyncRTAppleWorkQueue.o"
 
@@ -224,7 +221,6 @@ xcrun --sdk iphonesimulator clang \
   -Wextra \
   -Werror \
   -DASYNCRT_ENABLE_METAL=1 \
-  -DASYNCRT_ENABLE_TESTING=1 \
   -I "${async_runtime_headers_path}" \
   -c "${async_runtime_source_path}" \
   -o "${simulator_root}/AsyncRTDeviceContextCAPI.o"

@@ -45,6 +45,10 @@ for metal_runtime_symbol in \
   xcrun nm -gU "${simulator_library}" | grep -q " _${metal_runtime_symbol}$"
 done
 for library_path in "${device_library}" "${simulator_library}"; do
+  if xcrun nm -gU "${library_path}" | grep -q ' _AsyncRT_Test_'; then
+    echo "test-only AsyncRT controls leaked into ${library_path}" >&2
+    exit 1
+  fi
   if xcrun nm -gU "${library_path}" | \
     grep -Eq ' _(AsyncRT_CoreAI_|mojo_ios_coreai_|__mojo_coreai_semantic_)'; then
     echo "project-specific Core AI graph ABI leaked into ${library_path}" >&2
@@ -107,4 +111,4 @@ test "${simulator_metal_runtime_platform}" = "7"
 variant_count="$(/usr/libexec/PlistBuddy -c 'Print :AvailableLibraries' "${xcframework_path}/Info.plist" | grep -c 'Dict')"
 test "${variant_count}" = "2"
 
-echo "verified device platform=2, simulator platform=7, core/async exports, language AsyncRT, CPU/Metal runtime, and no project-specific Core AI graph ABI"
+echo "verified device platform=2, simulator platform=7, core/async exports, language AsyncRT, CPU/Metal runtime, no test controls, and no project-specific Core AI graph ABI"

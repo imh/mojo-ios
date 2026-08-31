@@ -20,11 +20,13 @@ the graph compiler and device driver are supplied by the closed `max._core`
 module. It currently knows CPU, GPU, and NPU devices and exposes no open-source
 backend registration point through which this project can add Core AI.
 
-Consequently, `linalg.matmul[target="coreai"]` fails during compilation with a
-named not-implemented diagnostic. `coreai` is not classified as a programmable
-accelerator or a valid kernel target, so standard operations cannot accidentally
-take GPU lowering. Dynamic `DeviceRef.CoreAI().to_device()` likewise fails by
-name instead of aliasing another device.
+Consequently, no source-level `coreai` target is currently registered. There
+is no `coreai` device label, `DeviceRef`, public classification helper, or
+operation-specific branch to suggest otherwise. Runtime-selected
+`DeviceContext(api="coreai")` construction fails explicitly because the
+standard graph backend is unavailable. Source-level target registration and
+operation diagnostics arrive together with the generic graph-backend
+extension, not before it.
 
 ## Prohibited shortcuts
 
@@ -66,9 +68,9 @@ pixi run test-coreai-target-contract
 pixi run test-asyncrt-host
 ```
 
-These prove distinct target recognition, compile-time rejection through the
-standard operation, absence of removed fixed ABIs, and truthful behavior of the
-minimal logical context. They do not prove graph execution.
+These prove that the runtime rejects context creation and that removed fixed
+ABIs and premature public target surfaces remain absent. They do not prove
+source-level target dispatch or graph execution.
 
 The separate Apple feasibility commands in
 [COREAI_FEASIBILITY_GATE.md](COREAI_FEASIBILITY_GATE.md) prove that public Core

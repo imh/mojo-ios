@@ -6,15 +6,6 @@ import UIKit
 @_silgen_name("KGEN_CompilerRT_DestroyGlobals")
 private func destroyMojoGlobalsForTesting()
 
-@_silgen_name("AsyncRT_Test_resetTaskMetrics")
-private func resetAsyncRTTaskMetricsForTesting()
-
-@_silgen_name("AsyncRT_Test_peakTaskCount")
-private func asyncRTPeakTaskCountForTesting() -> UInt32
-
-@_silgen_name("AsyncRT_Test_enableTwoTaskRendezvous")
-private func enableAsyncRTTwoTaskRendezvousForTesting()
-
 #if MOJO_IOS_ENABLE_METAL_SMOKE
     @_silgen_name("mojo_ios_metal_vector_add")
     private func mojoIOSMetalVectorAdd(
@@ -90,8 +81,6 @@ final class DeviceSmokeSceneDelegate: UIResponder, UIWindowSceneDelegate {
         precondition(mojo_ios_argument_count() == 1)
         mojo_ios_print_diagnostic()
 
-        resetAsyncRTTaskMetricsForTesting()
-        enableAsyncRTTwoTaskRendezvousForTesting()
         var concurrencyDiagnostic = [Int64](repeating: 0, count: 256)
         concurrencyDiagnostic.withUnsafeMutableBufferPointer { buffer in
             mojo_ios_parallel_fill_squares(
@@ -101,7 +90,6 @@ final class DeviceSmokeSceneDelegate: UIResponder, UIWindowSceneDelegate {
         precondition(concurrencyDiagnostic[0] == 0)
         precondition(concurrencyDiagnostic[1] == 1)
         precondition(concurrencyDiagnostic[255] == 65_025)
-        precondition(asyncRTPeakTaskCountForTesting() > 1)
 
         DispatchQueue.concurrentPerform(iterations: 4) { workerIndex in
             var squares = [Int64](repeating: 0, count: 1_024)
@@ -116,10 +104,7 @@ final class DeviceSmokeSceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         precondition(mojo_ios_async_await_sum(20, 19) == 42)
-        resetAsyncRTTaskMetricsForTesting()
-        enableAsyncRTTwoTaskRendezvousForTesting()
         precondition(mojo_ios_async_parallel_sum(20, 19) == 42)
-        precondition(asyncRTPeakTaskCountForTesting() > 1)
         precondition(mojo_ios_async_error_status(0) == 0)
         precondition(mojo_ios_async_error_status(1) == -1)
         DispatchQueue.concurrentPerform(iterations: 8) { workerIndex in
@@ -177,7 +162,7 @@ final class DeviceSmokeSceneDelegate: UIResponder, UIWindowSceneDelegate {
         print(
             "MOJO_IOS_DEVICE_SMOKE_PASS result=42 list_sum=4950 "
                 + "iterations=1000 globals=recreated process=integrated "
-                + "concurrency=parallel foreign_threads=passed "
+                + "parallel_api=passed foreign_threads=passed "
                 + "async=suspend-resume-errors" + metalMarker
         )
         exit(EXIT_SUCCESS)

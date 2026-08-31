@@ -54,11 +54,12 @@ Core AI currently has a deliberately separate Apple feasibility probe, not a
 Mojo backend. Direct graph authoring, eight iOS AOT specializations, host
 numerical execution, public-Swift device builds, and physical M1 iPad execution
 pass. The probe demonstrates the public Apple toolchain and runtime only; it is
-not shipped in the Mojo XCFramework or Swift package. Standard
-`linalg.matmul[target="coreai"]` fails at compile time because the open-source
-MAX tree does not expose the graph-compiler/driver extension needed for a real
-backend. There is no fixed-graph compiler pass, project-specific runtime ABI,
-or CPU/Metal fallback.
+not shipped in the Mojo XCFramework or Swift package. The project does not
+register `target="coreai"`, a public Core AI device label,
+or a pseudo-context ahead of the generic graph-compiler/driver extension needed
+for a real backend. Runtime-selected Core AI context creation fails explicitly.
+There is no fixed-graph compiler pass, project-specific runtime ABI, or
+CPU/Metal fallback.
 
 Deliberately unsupported target-sensitive calls fail during compilation with
 the operation named in the diagnostic:

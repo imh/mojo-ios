@@ -6,15 +6,6 @@ import XCTest
 @_silgen_name("KGEN_CompilerRT_DestroyGlobals")
 private func destroyMojoGlobalsForTesting()
 
-@_silgen_name("AsyncRT_Test_resetTaskMetrics")
-private func resetAsyncRTTaskMetricsForTesting()
-
-@_silgen_name("AsyncRT_Test_peakTaskCount")
-private func asyncRTPeakTaskCountForTesting() -> UInt32
-
-@_silgen_name("AsyncRT_Test_enableTwoTaskRendezvous")
-private func enableAsyncRTTwoTaskRendezvousForTesting()
-
 final class MojoIOSTests: XCTestCase {
     func testMojoAddition() {
         XCTAssertEqual(MojoIOS.add(20, 22), 42)
@@ -38,15 +29,12 @@ final class MojoIOSTests: XCTestCase {
         mojo_ios_print_diagnostic()
     }
 
-    func testMojoCodeRunsOnConcurrentCPUWorkers() {
-        resetAsyncRTTaskMetricsForTesting()
-        enableAsyncRTTwoTaskRendezvousForTesting()
+    func testMojoParallelSquares() {
         let result = MojoIOS.parallelSquares(count: 256)
         XCTAssertEqual(result.count, 256)
         XCTAssertEqual(result[0], 0)
         XCTAssertEqual(result[1], 1)
         XCTAssertEqual(result[255], 65_025)
-        XCTAssertGreaterThan(asyncRTPeakTaskCountForTesting(), 1)
     }
 
     func testParallelMojoCallsFromSwiftOwnedThreads() {
@@ -62,11 +50,8 @@ final class MojoIOSTests: XCTestCase {
         XCTAssertEqual(MojoIOS.asyncAwaitSum(20, 19), 42)
     }
 
-    func testMojoAsyncUsesConcurrentExecutorThreads() {
-        resetAsyncRTTaskMetricsForTesting()
-        enableAsyncRTTwoTaskRendezvousForTesting()
+    func testMojoAsyncParallelSum() {
         XCTAssertEqual(MojoIOS.asyncParallelSum(20, 19), 42)
-        XCTAssertGreaterThan(asyncRTPeakTaskCountForTesting(), 1)
     }
 
     func testMojoAsyncRaisedErrorsReachTheSynchronousBoundary() {

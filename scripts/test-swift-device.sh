@@ -5,7 +5,7 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 device_smoke_app="${project_root}/build/DeviceSmoke/Debug-iphoneos/MojoIOSDeviceSmoke.app"
 device_smoke_bundle_identifier="com.ianhorn.mojoios.devicesmoke"
 enable_metal_smoke="${MOJO_IOS_ENABLE_METAL_SMOKE:-OFF}"
-expected_marker="MOJO_IOS_DEVICE_SMOKE_PASS result=42 list_sum=4950 iterations=1000 globals=recreated process=integrated concurrency=parallel foreign_threads=passed async=suspend-resume-errors"
+expected_marker="MOJO_IOS_DEVICE_SMOKE_PASS result=42 list_sum=4950 iterations=1000 globals=recreated process=integrated parallel_api=passed foreign_threads=passed async=suspend-resume-errors"
 
 case "${enable_metal_smoke}" in
   ON) expected_marker="${expected_marker} metal=useful-mvp" ;;

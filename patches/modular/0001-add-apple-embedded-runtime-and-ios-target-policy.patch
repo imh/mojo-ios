@@ -156,10 +156,10 @@ index 0000000000..b38c09c9f6
 +#endif // ASYNCRT_RUNTIME_DEVICE_CONTEXT_C_API_H
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h b/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h
 new file mode 100644
-index 0000000000..4766be06d5
+index 0000000000..612c6a8b4a
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,42 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -184,7 +184,6 @@ index 0000000000..4766be06d5
 +  ASYNCRT_APPLE_DEVICE_CONTEXT_MAGIC = 0x41535254,
 +  ASYNCRT_APPLE_DEVICE_CONTEXT_CPU = 1,
 +  ASYNCRT_APPLE_DEVICE_CONTEXT_METAL = 2,
-+  ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI = 3,
 +};
 +
 +typedef struct {
@@ -409,10 +408,10 @@ index 0000000000..5f56e4b20a
 +#endif // ASYNCRT_RUNTIME_APPLE_WORK_QUEUE_H
 diff --git a/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
 new file mode 100644
-index 0000000000..0a9dc82869
+index 0000000000..e01e03f46a
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
-@@ -0,0 +1,350 @@
+@@ -0,0 +1,288 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -447,11 +446,6 @@ index 0000000000..0a9dc82869
 +  dispatch_group_t pending_tasks;
 +} AsyncRTCPUDeviceContext;
 +
-+typedef struct {
-+  AsyncRTAppleDeviceContextBase base;
-+  dispatch_group_t pending_tasks;
-+} AsyncRTCoreAIDeviceContext;
-+
 +typedef struct AsyncRTCoroutineBatch AsyncRTCoroutineBatch;
 +
 +typedef struct {
@@ -485,26 +479,13 @@ index 0000000000..0a9dc82869
 +  return context;
 +}
 +
-+static AsyncRTCoreAIDeviceContext *
-+asyncrt_apple_coreai_context_from_untyped(void *untyped_context) {
-+  AsyncRTCoreAIDeviceContext *context = untyped_context;
-+  assert(context != NULL);
-+  assert(context->base.magic == ASYNCRT_APPLE_DEVICE_CONTEXT_MAGIC);
-+  assert(context->base.kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI);
-+  assert(atomic_load_explicit(&context->base.reference_count,
-+                              memory_order_acquire) > 0);
-+  assert(context->pending_tasks != NULL);
-+  return context;
-+}
-+
 +static AsyncRTAppleDeviceContextBase *
 +asyncrt_apple_device_context_base_from_untyped(void *untyped_context) {
 +  AsyncRTAppleDeviceContextBase *context = untyped_context;
 +  assert(context != NULL);
 +  assert(context->magic == ASYNCRT_APPLE_DEVICE_CONTEXT_MAGIC);
 +  assert(context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_CPU ||
-+         context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_METAL ||
-+         context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI);
++         context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_METAL);
 +  assert(atomic_load_explicit(&context->reference_count, memory_order_acquire) >
 +         0);
 +  return context;
@@ -555,19 +536,9 @@ index 0000000000..0a9dc82869
 +#endif
 +  }
 +  if (strcmp(api, "coreai") == 0) {
-+    if (device_id != 0)
-+      return asyncrt_apple_owned_error(
-+          "the embedded Apple Core AI DeviceContext supports only device 0");
-+
-+    AsyncRTCoreAIDeviceContext *context = malloc(sizeof(*context));
-+    assert(context != NULL);
-+    atomic_init(&context->base.reference_count, 1);
-+    context->base.magic = ASYNCRT_APPLE_DEVICE_CONTEXT_MAGIC;
-+    context->base.kind = ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI;
-+    context->pending_tasks = dispatch_group_create();
-+    assert(context->pending_tasks != NULL);
-+    *result = context;
-+    return NULL;
++    return asyncrt_apple_owned_error(
++        "Core AI DeviceContext is not implemented because the standard MAX "
++        "graph backend is unavailable");
 +  }
 +  if (strcmp(api, "cpu") != 0)
 +    return asyncrt_apple_owned_error(
@@ -614,18 +585,6 @@ index 0000000000..0a9dc82869
 +#endif
 +  }
 +
-+  if (context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI) {
-+    AsyncRTCoreAIDeviceContext *coreai_context = untyped_context;
-+    assert(dispatch_group_wait(coreai_context->pending_tasks,
-+                               DISPATCH_TIME_NOW) == 0 &&
-+           "the final Core AI DeviceContext reference cannot be released "
-+           "with pending tasks");
-+    coreai_context->base.magic = 0;
-+    dispatch_release(coreai_context->pending_tasks);
-+    free(coreai_context);
-+    return;
-+  }
-+
 +  AsyncRTCPUDeviceContext *cpu_context = untyped_context;
 +  assert(dispatch_group_wait(cpu_context->pending_tasks, DISPATCH_TIME_NOW) ==
 +             0 &&
@@ -643,13 +602,9 @@ index 0000000000..0a9dc82869
 +  assert(result != NULL);
 +  static const char cpu_api[] = "cpu";
 +  static const char metal_api[] = "metal";
-+  static const char coreai_api[] = "coreai";
 +  if (context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_METAL) {
 +    result->data = metal_api;
 +    result->length = 5;
-+  } else if (context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI) {
-+    result->data = coreai_api;
-+    result->length = 6;
 +  } else {
 +    result->data = cpu_api;
 +    result->length = 3;
@@ -667,11 +622,6 @@ index 0000000000..0a9dc82869
 +const char *AsyncRT_DeviceContext_getAttribute(int32_t *result,
 +                                               void *untyped_context,
 +                                               int32_t attribute) {
-+  AsyncRTAppleDeviceContextBase *base =
-+      asyncrt_apple_device_context_base_from_untyped(untyped_context);
-+  if (base->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI)
-+    return asyncrt_apple_owned_error(
-+        "Core AI DeviceContext attributes are not implemented");
 +  (void)asyncrt_apple_device_context_from_untyped(untyped_context);
 +  if (result == NULL)
 +    return asyncrt_apple_owned_error("DeviceContext attribute result is null");
@@ -686,11 +636,6 @@ index 0000000000..0a9dc82869
 +    void *untyped_context, AsyncRTCoroutineFunction resume_function,
 +    AsyncRTCoroutineFunction destroy_function, void *const *handles,
 +    int64_t handle_count) {
-+  AsyncRTAppleDeviceContextBase *base =
-+      asyncrt_apple_device_context_base_from_untyped(untyped_context);
-+  if (base->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI)
-+    return asyncrt_apple_owned_error(
-+        "Core AI does not implement CPU coroutine-range enqueue");
 +  AsyncRTCPUDeviceContext *context =
 +      asyncrt_apple_device_context_from_untyped(untyped_context);
 +  if (resume_function == NULL)
@@ -743,14 +688,6 @@ index 0000000000..0a9dc82869
 +        "Metal synchronization is not implemented in this runtime build");
 +#endif
 +  }
-+  if (base->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI) {
-+    AsyncRTCoreAIDeviceContext *context =
-+        asyncrt_apple_coreai_context_from_untyped(untyped_context);
-+    long wait_result =
-+        dispatch_group_wait(context->pending_tasks, DISPATCH_TIME_FOREVER);
-+    assert(wait_result == 0);
-+    return NULL;
-+  }
 +  AsyncRTCPUDeviceContext *context =
 +      asyncrt_apple_device_context_from_untyped(untyped_context);
 +  long wait_result =
@@ -765,10 +702,10 @@ index 0000000000..0a9dc82869
 +}
 diff --git a/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
 new file mode 100644
-index 0000000000..4ac04b40f3
+index 0000000000..c0623d4d95
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
-@@ -0,0 +1,939 @@
+@@ -0,0 +1,879 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -794,7 +731,6 @@ index 0000000000..4ac04b40f3
 +  ASYNCRT_APPLE_METAL_BUFFER_MAGIC = 0x4D544C42,
 +  ASYNCRT_APPLE_METAL_FUNCTION_MAGIC = 0x4D544C46,
 +  ASYNCRT_APPLE_BUFFER_METAL = 1,
-+  ASYNCRT_APPLE_BUFFER_COREAI = 2,
 +};
 +
 +@interface AsyncRTMetalPendingHostCopy : NSObject
@@ -977,8 +913,7 @@ index 0000000000..4ac04b40f3
 +  assert(buffer->magic == ASYNCRT_APPLE_METAL_BUFFER_MAGIC);
 +  assert(atomic_load_explicit(&buffer->reference_count, memory_order_acquire) >
 +         0);
-+  assert(buffer->kind == ASYNCRT_APPLE_BUFFER_METAL ||
-+         buffer->kind == ASYNCRT_APPLE_BUFFER_COREAI);
++  assert(buffer->kind == ASYNCRT_APPLE_BUFFER_METAL);
 +  assert(buffer->storage != NULL);
 +  return buffer;
 +}
@@ -994,8 +929,7 @@ index 0000000000..4ac04b40f3
 +  assert(context != NULL);
 +  assert(context->magic == ASYNCRT_APPLE_DEVICE_CONTEXT_MAGIC);
 +  assert(context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_CPU ||
-+         context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_METAL ||
-+         context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI);
++         context->kind == ASYNCRT_APPLE_DEVICE_CONTEXT_METAL);
 +  assert(atomic_load_explicit(&context->reference_count, memory_order_acquire) >
 +         0);
 +  return context->kind;
@@ -1146,21 +1080,6 @@ index 0000000000..4ac04b40f3
 +      return asyncrt_metal_owned_error(
 +          "DeviceContext buffer exceeds AsyncRT limits");
 +
-+    if (context_kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI) {
-+      AsyncRTMetalDeviceBuffer *buffer = calloc(1, sizeof(*buffer));
-+      assert(buffer != NULL);
-+      size_t allocation_size = byte_count == 0 ? 1 : byte_count;
-+      buffer->storage = calloc(1, allocation_size);
-+      assert(buffer->storage != NULL);
-+      atomic_init(&buffer->reference_count, 1);
-+      buffer->magic = ASYNCRT_APPLE_METAL_BUFFER_MAGIC;
-+      buffer->kind = ASYNCRT_APPLE_BUFFER_COREAI;
-+      buffer->byte_count = byte_count;
-+      *result = buffer;
-+      *device_ptr = buffer->storage;
-+      return NULL;
-+    }
-+
 +    assert(context_kind == ASYNCRT_APPLE_DEVICE_CONTEXT_METAL);
 +    AsyncRTMetalDeviceContext *context =
 +        asyncrt_metal_context_from_untyped(untyped_context);
@@ -1206,13 +1125,8 @@ index 0000000000..4ac04b40f3
 +    if (previous_reference_count != 1)
 +      return;
 +    buffer->magic = 0;
-+    if (buffer->kind == ASYNCRT_APPLE_BUFFER_METAL) {
-+      __unused id<MTLBuffer> metal_buffer =
-+          (__bridge_transfer id<MTLBuffer>)buffer->storage;
-+    } else {
-+      assert(buffer->kind == ASYNCRT_APPLE_BUFFER_COREAI);
-+      free(buffer->storage);
-+    }
++    __unused id<MTLBuffer> metal_buffer =
++        (__bridge_transfer id<MTLBuffer>)buffer->storage;
 +    buffer->storage = NULL;
 +    free(buffer);
 +  }
@@ -1230,21 +1144,6 @@ index 0000000000..4ac04b40f3
 +                                             const void *source) {
 +  @autoreleasepool {
 +    uint32_t context_kind = asyncrt_apple_context_kind(untyped_context);
-+    if (context_kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI) {
-+      AsyncRTMetalDeviceBuffer *destination =
-+          asyncrt_metal_buffer_from_untyped(untyped_destination);
-+      assert(destination->kind == ASYNCRT_APPLE_BUFFER_COREAI);
-+      if (source == NULL && destination->byte_count != 0)
-+        return asyncrt_metal_owned_error(
-+            "Core AI host-to-context source is null");
-+      const char *synchronize_error =
-+          AsyncRT_DeviceContext_synchronize(untyped_context);
-+      if (synchronize_error != NULL)
-+        return synchronize_error;
-+      if (destination->byte_count != 0)
-+        memcpy(destination->storage, source, destination->byte_count);
-+      return NULL;
-+    }
 +    if (context_kind != ASYNCRT_APPLE_DEVICE_CONTEXT_METAL)
 +      return asyncrt_metal_owned_error(
 +          "host-to-device copy is not implemented for this DeviceContext");
@@ -1297,21 +1196,6 @@ index 0000000000..4ac04b40f3
 +                                             void *untyped_source) {
 +  @autoreleasepool {
 +    uint32_t context_kind = asyncrt_apple_context_kind(untyped_context);
-+    if (context_kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI) {
-+      AsyncRTMetalDeviceBuffer *source =
-+          asyncrt_metal_buffer_from_untyped(untyped_source);
-+      assert(source->kind == ASYNCRT_APPLE_BUFFER_COREAI);
-+      if (destination == NULL && source->byte_count != 0)
-+        return asyncrt_metal_owned_error(
-+            "Core AI context-to-host destination is null");
-+      const char *synchronize_error =
-+          AsyncRT_DeviceContext_synchronize(untyped_context);
-+      if (synchronize_error != NULL)
-+        return synchronize_error;
-+      if (source->byte_count != 0)
-+        memcpy(destination, source->storage, source->byte_count);
-+      return NULL;
-+    }
 +    if (context_kind != ASYNCRT_APPLE_DEVICE_CONTEXT_METAL)
 +      return asyncrt_metal_owned_error(
 +          "device-to-host copy is not implemented for this DeviceContext");
@@ -1376,9 +1260,6 @@ index 0000000000..4ac04b40f3
 +      return asyncrt_metal_owned_error("device function result is null");
 +    *result = NULL;
 +    uint32_t context_kind = asyncrt_apple_context_kind(untyped_context);
-+    if (context_kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI)
-+      return asyncrt_metal_owned_error(
-+          "Core AI does not implement device-function compilation or loading");
 +    if (context_kind != ASYNCRT_APPLE_DEVICE_CONTEXT_METAL)
 +      return asyncrt_metal_owned_error(
 +          "device-function loading is not implemented for this DeviceContext");
@@ -1472,10 +1353,6 @@ index 0000000000..4ac04b40f3
 +    const uint64_t *argument_sizes) {
 +  @autoreleasepool {
 +    uint32_t context_kind = asyncrt_apple_context_kind(untyped_context);
-+    if (context_kind == ASYNCRT_APPLE_DEVICE_CONTEXT_COREAI)
-+      return asyncrt_metal_owned_error(
-+          "Core AI does not implement raw kernel enqueue, grid/block "
-+          "dimensions, threadgroup memory, barriers, or launch attributes");
 +    if (context_kind != ASYNCRT_APPLE_DEVICE_CONTEXT_METAL)
 +      return asyncrt_metal_owned_error(
 +          "raw kernel enqueue is not implemented for this DeviceContext");
@@ -1826,10 +1703,10 @@ index b71bd3bc86..8a5d9f7271 100644
  /// required for Metal compatibility.
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
 new file mode 100644
-index 0000000000..5e57d2f5e7
+index 0000000000..790b4af6ce
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
-@@ -0,0 +1,559 @@
+@@ -0,0 +1,663 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -1847,7 +1724,7 @@ index 0000000000..5e57d2f5e7
 +#include "llvm/IR/Instructions.h"
 +#include "llvm/IR/Metadata.h"
 +#include "llvm/IR/Module.h"
-+#include "llvm/Support/ErrorHandling.h"
++#include "llvm/Support/Error.h"
 +#include "llvm/Support/raw_ostream.h"
 +
 +#include <array>
@@ -1856,6 +1733,8 @@ index 0000000000..5e57d2f5e7
 +namespace {
 +
 +constexpr llvm::StringLiteral kMetalKernelAttribute = "metal.kernel";
++constexpr llvm::StringLiteral kMetalAIRLoweringErrorMetadata =
++    "mojo.metal.air_lowering_error";
 +
 +struct MetalBuiltinFamily {
 +  llvm::StringLiteral functionNamePrefix;
@@ -1897,8 +1776,8 @@ index 0000000000..5e57d2f5e7
 +  return llvm::MDNode::get(context, operands);
 +}
 +
-+static llvm::Type *inferBufferElementType(const llvm::Argument &argument) {
-+  llvm::SmallVector<const llvm::Value *> worklist{&argument};
++static llvm::Type *inferBufferElementType(const llvm::Value &buffer) {
++  llvm::SmallVector<const llvm::Value *> worklist{&buffer};
 +  llvm::SmallSet<const llvm::Value *, 16> visited;
 +  llvm::Type *fallbackType = nullptr;
 +  while (!worklist.empty()) {
@@ -1921,6 +1800,109 @@ index 0000000000..5e57d2f5e7
 +    }
 +  }
 +  return fallbackType;
++}
++
++static llvm::StringRef airTypeName(llvm::Type *type);
++
++static llvm::Error validateAIRTypeAndLayout(llvm::Type *type,
++                                            const llvm::DataLayout &layout,
++                                            llvm::StringRef description) {
++  llvm::TypeSize typeSize = layout.getTypeStoreSize(type);
++  uint64_t typeAlignment = layout.getABITypeAlign(type).value();
++  if (typeSize.isScalable() || typeSize.getFixedValue() == 0 ||
++      typeSize.getFixedValue() > UINT32_MAX || typeAlignment > UINT32_MAX)
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        ("Metal " + description + " layout is not implemented").str());
++  return llvm::Error::success();
++}
++
++static llvm::Error validateMetalAIRModule(
++    llvm::Module &module, llvm::ArrayRef<llvm::Function *> kernels) {
++  if (kernels.empty())
++    return llvm::createStringError(llvm::inconvertibleErrorCode(),
++                                   "Metal module has no kernel entry point");
++
++  llvm::SmallSet<const llvm::Function *, 8> kernelSet;
++  for (llvm::Function *kernel : kernels)
++    kernelSet.insert(kernel);
++
++  const llvm::DataLayout &layout = module.getDataLayout();
++  for (llvm::Function *kernel : kernels) {
++    for (llvm::Argument &argument : kernel->args()) {
++      if (argument.getType()->isPointerTy()) {
++        llvm::Type *elementType = inferBufferElementType(argument);
++        if (!elementType)
++          return llvm::createStringError(
++              llvm::inconvertibleErrorCode(),
++              "Metal buffer argument element type inference is not "
++              "implemented");
++        if (airTypeName(elementType).empty()) {
++          std::string typeDescription;
++          llvm::raw_string_ostream stream(typeDescription);
++          elementType->print(stream);
++          return llvm::createStringError(
++              llvm::inconvertibleErrorCode(),
++              "Metal buffer argument element type is not implemented: " +
++                  typeDescription);
++        }
++        if (llvm::Error error =
++                validateAIRTypeAndLayout(elementType, layout, "buffer element"))
++          return error;
++        continue;
++      }
++
++      if (llvm::Error error = validateAIRTypeAndLayout(
++              argument.getType(), layout, "constant kernel argument"))
++        return error;
++      if (airTypeName(argument.getType()).empty() &&
++          !argument.getType()->isAggregateType())
++        return llvm::createStringError(
++            llvm::inconvertibleErrorCode(),
++            "Metal constant kernel argument type is not implemented");
++    }
++  }
++
++  for (llvm::GlobalVariable &global : module.globals()) {
++    if (global.getAddressSpace() != 3 || !global.isDeclaration())
++      continue;
++    bool hasKernelUse = false;
++    for (llvm::User *user : global.users()) {
++      auto *instruction = llvm::dyn_cast<llvm::Instruction>(user);
++      if (!instruction || !kernelSet.contains(instruction->getFunction()))
++        return llvm::createStringError(
++            llvm::inconvertibleErrorCode(),
++            "Metal dynamic threadgroup memory through a non-inlined helper "
++            "function is not implemented");
++      hasKernelUse = true;
++    }
++    if (!hasKernelUse)
++      continue;
++    llvm::Type *elementType = inferBufferElementType(global);
++    if (!elementType)
++      return llvm::createStringError(
++          llvm::inconvertibleErrorCode(),
++          "Metal dynamic threadgroup element type inference is not "
++          "implemented");
++    if (airTypeName(elementType).empty())
++      return llvm::createStringError(
++          llvm::inconvertibleErrorCode(),
++          "Metal dynamic threadgroup element type is not implemented");
++    if (llvm::Error error = validateAIRTypeAndLayout(
++            elementType, layout, "dynamic threadgroup element"))
++      return error;
++  }
++  return llvm::Error::success();
++}
++
++static void recordMetalAIRLoweringError(llvm::Module &module,
++                                        llvm::StringRef message) {
++  assert(!message.empty());
++  llvm::NamedMDNode *metadata =
++      module.getOrInsertNamedMetadata(kMetalAIRLoweringErrorMetadata);
++  metadata->clearOperands();
++  metadata->addOperand(llvm::MDNode::get(
++      module.getContext(), llvm::MDString::get(module.getContext(), message)));
 +}
 +
 +static llvm::StringRef airTypeName(llvm::Type *type) {
@@ -2042,9 +2024,8 @@ index 0000000000..5e57d2f5e7
 +            (newArgument->getName() + ".generic").str());
 +    } else {
 +      llvm::TypeSize typeSize = layout.getTypeStoreSize(oldArgument.getType());
-+      if (typeSize.isScalable() || typeSize.getFixedValue() == 0)
-+        llvm::report_fatal_error("Metal zero-sized or scalable kernel "
-+                                 "arguments are not implemented");
++      assert(!typeSize.isScalable() && typeSize.getFixedValue() != 0 &&
++             "Metal argument layout must be validated before ABI rewriting");
 +      replacement = builder.CreateAlignedLoad(
 +          oldArgument.getType(), &*newArgument,
 +          layout.getABITypeAlign(oldArgument.getType()),
@@ -2063,10 +2044,8 @@ index 0000000000..5e57d2f5e7
 +                llvm::dyn_cast<llvm::Instruction>(use.getUser()))
 +          if (instruction->getFunction() == newKernel)
 +            kernelUses.push_back(&use);
-+      if (kernelUses.empty())
-+        llvm::report_fatal_error(
-+            "Metal dynamic threadgroup memory through a non-inlined helper "
-+            "function is not implemented");
++      assert(!kernelUses.empty() &&
++             "Metal threadgroup uses must be validated before ABI rewriting");
 +      for (llvm::Use *use : kernelUses)
 +        use->set(&*newArgument);
 +    }
@@ -2105,24 +2084,17 @@ index 0000000000..5e57d2f5e7
 +                                                 llvm::Argument &argument,
 +                                                 uint32_t index) {
 +  llvm::Type *elementType = inferBufferElementType(argument);
-+  if (!elementType)
-+    llvm::report_fatal_error(
-+        "Metal buffer argument element type inference is not implemented");
++  assert(elementType &&
++         "Metal buffer type must be validated before metadata construction");
 +  llvm::StringRef typeName = airTypeName(elementType);
-+  if (typeName.empty()) {
-+    std::string message;
-+    llvm::raw_string_ostream stream(message);
-+    stream << "Metal buffer argument element type is not implemented: ";
-+    elementType->print(stream);
-+    stream.flush();
-+    llvm::report_fatal_error(llvm::StringRef(message));
-+  }
++  assert(!typeName.empty() &&
++         "Metal buffer type must be validated before metadata construction");
 +
 +  const llvm::DataLayout &layout = kernel.getParent()->getDataLayout();
 +  uint64_t typeSize = layout.getTypeStoreSize(elementType).getFixedValue();
 +  uint64_t typeAlignment = layout.getABITypeAlign(elementType).value();
-+  if (typeSize > UINT32_MAX || typeAlignment > UINT32_MAX)
-+    llvm::report_fatal_error("Metal buffer element layout exceeds AIR limits");
++  assert(typeSize <= UINT32_MAX && typeAlignment <= UINT32_MAX &&
++         "Metal buffer layout must be validated before metadata construction");
 +
 +  llvm::LLVMContext &context = kernel.getContext();
 +  std::string fallbackName = ("argument" + llvm::Twine(index)).str();
@@ -2150,20 +2122,17 @@ index 0000000000..5e57d2f5e7
 +                                                   uint32_t index) {
 +  const llvm::DataLayout &layout = kernel.getParent()->getDataLayout();
 +  llvm::TypeSize typeSize = layout.getTypeStoreSize(valueType);
-+  if (typeSize.isScalable() || typeSize.getFixedValue() == 0 ||
-+      typeSize.getFixedValue() > UINT32_MAX)
-+    llvm::report_fatal_error(
-+        "Metal constant kernel argument layout is not implemented");
++  assert(!typeSize.isScalable() && typeSize.getFixedValue() != 0 &&
++         typeSize.getFixedValue() <= UINT32_MAX &&
++         "Metal constant layout must be validated before metadata construction");
 +  uint64_t typeAlignment = layout.getABITypeAlign(valueType).value();
-+  if (typeAlignment > UINT32_MAX)
-+    llvm::report_fatal_error(
-+        "Metal constant kernel argument alignment exceeds AIR limits");
++  assert(typeAlignment <= UINT32_MAX &&
++         "Metal constant alignment must be validated before metadata construction");
 +
 +  llvm::StringRef typeName = airTypeName(valueType);
 +  if (typeName.empty()) {
-+    if (!valueType->isAggregateType())
-+      llvm::report_fatal_error(
-+          "Metal constant kernel argument type is not implemented");
++    assert(valueType->isAggregateType() &&
++           "Metal constant type must be validated before metadata construction");
 +    typeName = "void";
 +  }
 +
@@ -2193,21 +2162,17 @@ index 0000000000..5e57d2f5e7
 +static llvm::MDNode *buildDynamicThreadgroupArgumentMetadata(
 +    llvm::Function &kernel, llvm::Argument &argument, uint32_t locationIndex) {
 +  llvm::Type *elementType = inferBufferElementType(argument);
-+  if (!elementType)
-+    llvm::report_fatal_error(
-+        "Metal dynamic threadgroup element type inference is not implemented");
++  assert(elementType && "Metal threadgroup type must be prevalidated");
 +  llvm::StringRef typeName = airTypeName(elementType);
-+  if (typeName.empty())
-+    llvm::report_fatal_error(
-+        "Metal dynamic threadgroup element type is not implemented");
++  assert(!typeName.empty() && "Metal threadgroup type must be prevalidated");
 +
 +  const llvm::DataLayout &layout = kernel.getParent()->getDataLayout();
 +  llvm::TypeSize typeSize = layout.getTypeStoreSize(elementType);
 +  uint64_t typeAlignment = layout.getABITypeAlign(elementType).value();
-+  if (typeSize.isScalable() || typeSize.getFixedValue() > UINT32_MAX ||
-+      typeAlignment > UINT32_MAX)
-+    llvm::report_fatal_error(
-+        "Metal dynamic threadgroup element layout exceeds AIR limits");
++  assert(!typeSize.isScalable() && typeSize.getFixedValue() != 0 &&
++         typeSize.getFixedValue() <= UINT32_MAX &&
++         typeAlignment <= UINT32_MAX &&
++         "Metal threadgroup layout must be prevalidated");
 +
 +  llvm::LLVMContext &context = kernel.getContext();
 +  return metadataNode(
@@ -2319,6 +2284,21 @@ index 0000000000..5e57d2f5e7
 +
 +} // namespace
 +
++std::optional<std::string>
++getMetalAIRLoweringError(const llvm::Module &module) {
++  const llvm::NamedMDNode *metadata =
++      module.getNamedMetadata(kMetalAIRLoweringErrorMetadata);
++  if (!metadata || metadata->getNumOperands() == 0)
++    return std::nullopt;
++  assert(metadata->getNumOperands() == 1 &&
++         "Metal AIR lowering records exactly one diagnostic");
++  const llvm::MDNode *node = metadata->getOperand(0);
++  assert(node->getNumOperands() == 1 &&
++         "Metal AIR diagnostic metadata must contain one string");
++  const auto *message = llvm::cast<llvm::MDString>(node->getOperand(0));
++  return message->getString().str();
++}
++
 +llvm::PreservedAnalyses
 +PrepareMetalAIRPass::run(llvm::Module &module,
 +                         llvm::ModuleAnalysisManager &analysisManager) {
@@ -2338,14 +2318,17 @@ index 0000000000..5e57d2f5e7
 +MetalAIRPass::run(llvm::Module &module,
 +                  llvm::ModuleAnalysisManager &analysisManager) {
 +  (void)analysisManager;
-+  addModuleMetadata(module);
 +
 +  llvm::SmallVector<llvm::Function *> kernels;
 +  for (llvm::Function &function : module)
 +    if (function.hasFnAttribute(kMetalKernelAttribute))
 +      kernels.push_back(&function);
-+  if (kernels.empty())
-+    llvm::report_fatal_error("Metal module has no kernel entry point");
++  if (llvm::Error error = validateMetalAIRModule(module, kernels)) {
++    recordMetalAIRLoweringError(module, llvm::toString(std::move(error)));
++    return llvm::PreservedAnalyses::none();
++  }
++
++  addModuleMetadata(module);
 +
 +  for (llvm::Function *oldKernel : kernels) {
 +    llvm::SmallVector<llvm::Type *> explicitArgumentTypes =
@@ -2367,10 +2350,8 @@ index 0000000000..5e57d2f5e7
 +       llvm::make_early_inc_range(module.globals())) {
 +    if (global.getAddressSpace() != 3 || !global.isDeclaration())
 +      continue;
-+    if (!global.use_empty())
-+      llvm::report_fatal_error(
-+          "Metal dynamic threadgroup memory through a non-inlined helper "
-+          "function is not implemented");
++    assert(global.use_empty() &&
++           "Metal threadgroup uses must be validated before legalization");
 +    global.eraseFromParent();
 +  }
 +
@@ -2391,10 +2372,10 @@ index 0000000000..5e57d2f5e7
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h
 new file mode 100644
-index 0000000000..d15869ad93
+index 0000000000..a41ca765d1
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,46 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -2407,7 +2388,15 @@ index 0000000000..d15869ad93
 +
 +#include "llvm/IR/PassManager.h"
 +
++#include <optional>
++#include <string>
++
 +namespace M::KGEN {
++
++/// Returns the ordinary compiler diagnostic recorded when AIR legalization
++/// rejects a module, if any.  The backend checks this before emitting an
++/// assembly or object artifact.
++std::optional<std::string> getMetalAIRLoweringError(const llvm::Module &module);
 +
 +/// Removes host-codegen attributes before the generic LLVM optimization
 +/// pipeline sees an AIR module. AIR feature strings describe the Metal
@@ -2459,10 +2448,10 @@ index fcd0786720..cebfc34515 100644
    if (!llvmModule)
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp
 new file mode 100644
-index 0000000000..05737b9887
+index 0000000000..8af2f6c344
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,204 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -2546,6 +2535,8 @@ index 0000000000..05737b9887
 +ErrorOr<BufferRef> MetalBackend::emitAssembly(llvm::Module &module,
 +                                              EmitContext &ctx) const {
 +  (void)ctx;
++  if (std::optional<std::string> error = getMetalAIRLoweringError(module))
++    return Error(*error);
 +  WriteableBufferRef output = WriteableBuffer::get();
 +  module.print(*output, nullptr);
 +  return BufferRef::take(output.release());
@@ -2554,6 +2545,8 @@ index 0000000000..05737b9887
 +ErrorOr<BufferRef> MetalBackend::emitObject(llvm::Module &module,
 +                                            EmitContext &ctx) const {
 +  (void)ctx;
++  if (std::optional<std::string> error = getMetalAIRLoweringError(module))
++    return Error(*error);
 +  ErrorOr<TempFile> airFileOr =
 +      writeTempFile("mojo-metal-%%%%%%.air", [&](llvm::raw_ostream &output) {
 +        LLVM::WriteBitcode17ToFile(module, output,
@@ -4086,10 +4079,10 @@ index dad2e78a59..4c52a37969 100644
    if (adapteeParts.needsResultConversion) {
 diff --git a/KGEN/lib/Target/Metal/MetalTraits.cpp b/KGEN/lib/Target/Metal/MetalTraits.cpp
 new file mode 100644
-index 0000000000..258be7a2af
+index 0000000000..0a9817a316
 --- /dev/null
 +++ b/KGEN/lib/Target/Metal/MetalTraits.cpp
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,50 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -4119,15 +4112,10 @@ index 0000000000..258be7a2af
 +MetalTraits::supportedAcceleratorArchs() const {
 +  static constexpr AcceleratorArch architectures[] = {
 +      {"apple-m1", "Apple M1"},
-+      {"apple-m1-metal4", "Apple M1 (Metal 4)"},
 +      {"apple-m2", "Apple M2"},
-+      {"apple-m2-metal4", "Apple M2 (Metal 4)"},
 +      {"apple-m3", "Apple M3"},
-+      {"apple-m3-metal4", "Apple M3 (Metal 4)"},
 +      {"apple-m4", "Apple M4"},
-+      {"apple-m4-metal4", "Apple M4 (Metal 4)"},
 +      {"apple-m5", "Apple M5"},
-+      {"apple-m5-metal4", "Apple M5 (Metal 4)"},
 +  };
 +  return architectures;
 +}
@@ -4255,18 +4243,6 @@ index 15efcd2723..d26e818d2c 100644
      image = existingImage->getSecond();
    } else {
      builder.setInsertionPoint(opWithUse);
-diff --git a/Support/include/Support/DeviceSpecs.h b/Support/include/Support/DeviceSpecs.h
-index b0080d1d89..16877393bc 100644
---- a/Support/include/Support/DeviceSpecs.h
-+++ b/Support/include/Support/DeviceSpecs.h
-@@ -142,6 +142,7 @@ struct DeviceRef {
- constexpr const char *kCPULabel = "cpu";
- constexpr const char *kGPULabel = "gpu";
- constexpr const char *kNPULabel = "npu";
-+constexpr const char *kCoreAILabel = "coreai";
- 
- } // namespace M
- 
 diff --git a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl b/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
 index 1e3797a730..b28bd1c860 100644
 --- a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
@@ -4279,34 +4255,6 @@ index 1e3797a730..b28bd1c860 100644
      "System/Library/Frameworks/Metal.framework/**",
      "System/Library/Frameworks/Security.framework/**",
      "System/Library/Frameworks/SystemConfiguration.framework/**",
-diff --git a/max/kernels/src/linalg/matmul/__init__.mojo b/max/kernels/src/linalg/matmul/__init__.mojo
-index 01ec97da7b..fe91e48eeb 100644
---- a/max/kernels/src/linalg/matmul/__init__.mojo
-+++ b/max/kernels/src/linalg/matmul/__init__.mojo
-@@ -19,7 +19,7 @@ from std.math import align_up, ceildiv
- from std.sys.info import align_of, simd_width_of
- 
- from max.gpu.host import DeviceContext
--from max.gpu.host.info import is_cpu, is_valid_target
-+from max.gpu.host.info import is_coreai, is_cpu, is_valid_target
- from layout import (
-     Layout,
-     LayoutTensor,
-@@ -104,7 +104,13 @@ def matmul[
-     comptime assert a.flat_rank == 2, "a must have a non-nested layout"
-     comptime assert b.flat_rank == 2, "b must have a non-nested layout"
- 
--    comptime if not is_cpu[target]():
-+    comptime if is_coreai[target]():
-+        comptime assert False, (
-+            "Core AI graph lowering is not implemented in the open-source "
-+            "MAX graph compiler; fixed LLVM marker lowering is intentionally "
-+            "unsupported"
-+        )
-+    elif not is_cpu[target]():
-         # GPU path: call _matmul_gpu directly with tracing. CPU-only params
-         # (b_packed, saturated_vnni) are intentionally not forwarded here.
-         comptime assert not transpose_a, "transpose_a not yet supported"
 diff --git a/max/mojo/max/gpu/host/_device_context_extras.mojo b/max/mojo/max/gpu/host/_device_context_extras.mojo
 index 0d010d7e4d..90d45c146c 100644
 --- a/max/mojo/max/gpu/host/_device_context_extras.mojo
@@ -4584,62 +4532,6 @@ index 443bc55bd8..86bf7018ba 100644
  
      assert_equal(len(encoder._buffers), 2)
  
-diff --git a/max/python/max/graph/type.py b/max/python/max/graph/type.py
-index b3d8139026..b1305735b8 100644
---- a/max/python/max/graph/type.py
-+++ b/max/python/max/graph/type.py
-@@ -106,6 +106,7 @@ class DeviceKind(str, Enum):
-     CPU = "cpu"
-     GPU = "gpu"
-     NPU = "npu"
-+    COREAI = "coreai"
- 
-     def __str__(self) -> str:
-         return self.value
-@@ -119,6 +120,8 @@ class DeviceKind(str, Enum):
-             return DeviceKind.GPU
-         elif txt == str(DeviceKind.NPU):
-             return DeviceKind.NPU
-+        elif txt == str(DeviceKind.COREAI):
-+            return DeviceKind.COREAI
-         else:
-             raise ValueError(f"Unknown device kind {txt}")
- 
-@@ -160,6 +163,11 @@ class DeviceRef:
-         """Creates an NPU device reference."""
-         return DeviceRef(DeviceKind.NPU, id)
- 
-+    @staticmethod
-+    def CoreAI(id: int = 0) -> DeviceRef:
-+        """Creates a Core AI managed-graph device reference."""
-+        return DeviceRef(DeviceKind.COREAI, id)
-+
-     def __init__(self, device_type: DeviceKind | str, id: int = 0) -> None:
-         if isinstance(device_type, DeviceKind):
-             self.device_type = device_type
-@@ -196,6 +204,11 @@ class DeviceRef:
-             return Accelerator(self.id)
-         elif self.device_type is DeviceKind.NPU:
-             return NPU(self.id)
-+        elif self.device_type is DeviceKind.COREAI:
-+            raise NotImplementedError(
-+                "Core AI driver materialization is not implemented; "
-+                "compile a supported AOT graph region instead"
-+            )
-         else:
-             raise ValueError(f"Unsupported device type: {self.device_type}")
- 
-@@ -211,6 +224,10 @@ class DeviceRef:
-         """Returns ``True`` if the device is an NPU device."""
-         return self.device_type is DeviceKind.NPU
- 
-+    def is_coreai(self) -> bool:
-+        """Returns ``True`` for the Core AI managed graph backend."""
-+        return self.device_type is DeviceKind.COREAI
-+
-     @staticmethod
-     def from_mlir(attr: m.DeviceRefAttr) -> DeviceRef:
-         """Returns a device reference from an MLIR attribute."""
 diff --git a/mojo/stdlib/std/compile/compile.mojo b/mojo/stdlib/std/compile/compile.mojo
 index 51520054b5..7b83b9c141 100644
 --- a/mojo/stdlib/std/compile/compile.mojo
@@ -4712,7 +4604,7 @@ index ed6c8f8515..75be889afa 100644
          if not handle:
              var error_message = dlerror()
 diff --git a/mojo/stdlib/std/gpu/host/info.mojo b/mojo/stdlib/std/gpu/host/info.mojo
-index b50f997970..3eb8bb987c 100644
+index b50f997970..2e65abf39c 100644
 --- a/mojo/stdlib/std/gpu/host/info.mojo
 +++ b/mojo/stdlib/std/gpu/host/info.mojo
 @@ -271,6 +271,22 @@ def _get_metal_m1_target() -> _TargetType:
@@ -4837,190 +4729,134 @@ index b50f997970..3eb8bb987c 100644
      return __mlir_attr[
          `#kgen.target<triple = "air64-apple-macosx", `,
          `stdlib_plugin = "metal", `,
-@@ -356,6 +443,22 @@ def _get_metal_m1_metal4_target() -> _TargetType:
-     Returns:
-         MLIR target configuration for M1 Metal 4.0.
-     """
-+    comptime if CompilationTarget.is_ios():
-+        comptime if CompilationTarget.is_simulator():
-+            return __mlir_attr[
-+                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
-+                `stdlib_plugin = "metal", arch = "apple-m1", `,
-+                `features = "+metal4_0,+air2_8_0", `,
-+                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+                `simd_bit_width = 128> : !kgen.target`,
-+            ]
-+        return __mlir_attr[
-+            `#kgen.target<triple = "air64-apple-ios27.0", `,
-+            `stdlib_plugin = "metal", arch = "apple-m1", `,
-+            `features = "+metal4_0,+air2_8_0", `,
-+            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+            `simd_bit_width = 128> : !kgen.target`,
-+        ]
-     return __mlir_attr[
-         `#kgen.target<triple = "air64-apple-macosx", `,
-         `stdlib_plugin = "metal", `,
-@@ -373,6 +476,22 @@ def _get_metal_m2_metal4_target() -> _TargetType:
-     Returns:
-         MLIR target configuration for M2 Metal 4.0.
-     """
-+    comptime if CompilationTarget.is_ios():
-+        comptime if CompilationTarget.is_simulator():
-+            return __mlir_attr[
-+                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
-+                `stdlib_plugin = "metal", arch = "apple-m2", `,
-+                `features = "+metal4_0,+air2_8_0", `,
-+                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+                `simd_bit_width = 128> : !kgen.target`,
-+            ]
-+        return __mlir_attr[
-+            `#kgen.target<triple = "air64-apple-ios27.0", `,
-+            `stdlib_plugin = "metal", arch = "apple-m2", `,
-+            `features = "+metal4_0,+air2_8_0", `,
-+            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+            `simd_bit_width = 128> : !kgen.target`,
-+        ]
-     return __mlir_attr[
-         `#kgen.target<triple = "air64-apple-macosx", `,
-         `stdlib_plugin = "metal", `,
-@@ -390,6 +509,22 @@ def _get_metal_m3_metal4_target() -> _TargetType:
-     Returns:
-         MLIR target configuration for M3 Metal 4.0.
-     """
-+    comptime if CompilationTarget.is_ios():
-+        comptime if CompilationTarget.is_simulator():
-+            return __mlir_attr[
-+                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
-+                `stdlib_plugin = "metal", arch = "apple-m3", `,
-+                `features = "+metal4_0,+air2_8_0", `,
-+                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+                `simd_bit_width = 128> : !kgen.target`,
-+            ]
-+        return __mlir_attr[
-+            `#kgen.target<triple = "air64-apple-ios27.0", `,
-+            `stdlib_plugin = "metal", arch = "apple-m3", `,
-+            `features = "+metal4_0,+air2_8_0", `,
-+            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+            `simd_bit_width = 128> : !kgen.target`,
-+        ]
-     return __mlir_attr[
-         `#kgen.target<triple = "air64-apple-macosx", `,
-         `stdlib_plugin = "metal", `,
-@@ -407,6 +542,22 @@ def _get_metal_m4_metal4_target() -> _TargetType:
-     Returns:
-         MLIR target configuration for M4 Metal 4.0.
-     """
-+    comptime if CompilationTarget.is_ios():
-+        comptime if CompilationTarget.is_simulator():
-+            return __mlir_attr[
-+                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
-+                `stdlib_plugin = "metal", arch = "apple-m4", `,
-+                `features = "+metal4_0,+air2_8_0", `,
-+                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+                `simd_bit_width = 128> : !kgen.target`,
-+            ]
-+        return __mlir_attr[
-+            `#kgen.target<triple = "air64-apple-ios27.0", `,
-+            `stdlib_plugin = "metal", arch = "apple-m4", `,
-+            `features = "+metal4_0,+air2_8_0", `,
-+            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+            `simd_bit_width = 128> : !kgen.target`,
-+        ]
-     return __mlir_attr[
-         `#kgen.target<triple = "air64-apple-macosx", `,
-         `stdlib_plugin = "metal", `,
-@@ -424,6 +575,22 @@ def _get_metal_m5_metal4_target() -> _TargetType:
-     Returns:
-         MLIR target configuration for M5 Metal 4.0.
-     """
-+    comptime if CompilationTarget.is_ios():
-+        comptime if CompilationTarget.is_simulator():
-+            return __mlir_attr[
-+                `#kgen.target<triple = "air64-apple-ios27.0-simulator", `,
-+                `stdlib_plugin = "metal", arch = "apple-m5", `,
-+                `features = "+metal4_0,+air2_8_0", `,
-+                `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+                `simd_bit_width = 128> : !kgen.target`,
-+            ]
-+        return __mlir_attr[
-+            `#kgen.target<triple = "air64-apple-ios27.0", `,
-+            `stdlib_plugin = "metal", arch = "apple-m5", `,
-+            `features = "+metal4_0,+air2_8_0", `,
-+            `data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32", `,
-+            `simd_bit_width = 128> : !kgen.target`,
-+        ]
-     return __mlir_attr[
-         `#kgen.target<triple = "air64-apple-macosx", `,
-         `stdlib_plugin = "metal", `,
-@@ -2319,10 +2486,38 @@ def is_npu(target: StringSlice) -> Bool:
-     return target == "npu"
+@@ -490,61 +577,6 @@ comptime MetalM5 = GPUInfo.from_family(
+ )
+ """Apple M5 GPU configuration."""
  
+-comptime MetalM1Metal4 = GPUInfo.from_family(
+-    family=AppleMetalFamily,
+-    name="M1 Metal4",
+-    api="metal",
+-    arch_name="apple-m1-metal4",
+-    compute=4.0,  # Metal 4.0, requires macOS 26
+-    version="metal_4",
+-    sm_count=8,  # M1 has 8 GPU cores
+-)
+-"""Apple M1 GPU configuration for Metal 4."""
+-
+-comptime MetalM2Metal4 = GPUInfo.from_family(
+-    family=AppleMetalFamily,
+-    name="M2 Metal4",
+-    api="metal",
+-    arch_name="apple-m2-metal4",
+-    compute=4.0,  # Metal 4.0, requires macOS 26
+-    version="metal_4",
+-    sm_count=10,  # M2 has 10 GPU cores
+-)
+-"""Apple M2 GPU configuration for Metal 4."""
+-
+-comptime MetalM3Metal4 = GPUInfo.from_family(
+-    family=AppleMetalFamily,
+-    name="M3 Metal4",
+-    api="metal",
+-    arch_name="apple-m3-metal4",
+-    compute=4.0,  # Metal 4.0, requires macOS 26
+-    version="metal_4",
+-    sm_count=10,  # M3 has 10 GPU cores
+-)
+-"""Apple M3 GPU configuration for Metal 4."""
+-
+-comptime MetalM4Metal4 = GPUInfo.from_family(
+-    family=AppleMetalFamily,
+-    name="M4 Metal4",
+-    api="metal",
+-    arch_name="apple-m4-metal4",
+-    compute=4.0,  # Metal 4.0, requires macOS 26
+-    version="metal_4",
+-    sm_count=10,  # M4 has 10 GPU cores
+-)
+-"""Apple M4 GPU configuration for Metal 4."""
+-
+-comptime MetalM5Metal4 = GPUInfo.from_family(
+-    family=AppleMetalFamily,
+-    name="M5 Metal4",
+-    api="metal",
+-    arch_name="apple-m5-metal4",
+-    compute=4.0,  # Metal 4.0, requires macOS 26
+-    version="metal_4",
+-    sm_count=10,  # M5 has 10 GPU cores
+-)
+-"""Apple M5 GPU configuration for Metal 4."""
+-
+ # ===-----------------------------------------------------------------------===#
+ # A100
+ # ===-----------------------------------------------------------------------===#
+@@ -1840,24 +1872,14 @@ struct GPUInfo(Copyable, Equatable, Movable, RegisterPassable, Writable):
+             return _get_steamdeck_target()
+         if self.name == "M1":
+             return _get_metal_m1_target()
+-        if self.name == "M1 Metal4":
+-            return _get_metal_m1_metal4_target()
+         if self.name == "M2":
+             return _get_metal_m2_target()
+-        if self.name == "M2 Metal4":
+-            return _get_metal_m2_metal4_target()
+         if self.name == "M3":
+             return _get_metal_m3_target()
+-        if self.name == "M3 Metal4":
+-            return _get_metal_m3_metal4_target()
+         if self.name == "M4":
+             return _get_metal_m4_target()
+-        if self.name == "M4 Metal4":
+-            return _get_metal_m4_metal4_target()
+         if self.name == "M5":
+             return _get_metal_m5_target()
+-        if self.name == "M5 Metal4":
+-            return _get_metal_m5_metal4_target()
  
-+def is_coreai[target: StringSlice]() -> Bool:
-+    """Checks if the target is the Core AI managed graph backend.
-+
-+    Parameters:
-+        target: Target string to check.
-+
-+    Returns:
-+        True if the target is Core AI, False otherwise.
-+    """
-+    return is_coreai(target)
-+
-+
-+def is_coreai(target: StringSlice) -> Bool:
-+    """Checks if the target is the Core AI managed graph backend.
-+
-+    Core AI is a logical execution target.  It does not promise that Apple
-+    will place every operation on the Neural Engine.
-+
-+    Args:
-+        target: Target string to check.
-+
-+    Returns:
-+        True if the target is Core AI, False otherwise.
-+    """
-+    return target == "coreai"
-+
-+
- def is_accelerator[target: StringSlice]() -> Bool:
-     """Checks if the target is an accelerator (compile-time version).
+         if self.name == "":
+             return _get_empty_target()
+@@ -2090,15 +2112,10 @@ comptime _all_targets = (
+     StaticString("gfx1200"),
+     StaticString("gfx1201"),
+     StaticString("apple-m1"),
+-    StaticString("apple-m1-metal4"),
+     StaticString("apple-m2"),
+-    StaticString("apple-m2-metal4"),
+     StaticString("apple-m3"),
+-    StaticString("apple-m3-metal4"),
+     StaticString("apple-m4"),
+-    StaticString("apple-m4-metal4"),
+     StaticString("apple-m5"),
+-    StaticString("apple-m5-metal4"),
+     StaticString("cuda"),
+ )
  
--    True for any non-CPU compute target -- GPUs and NPUs alike.
-+    True for programmable accelerator targets. Managed graph backends such as
-+    Core AI are not accelerator kernels and must be dispatched explicitly.
- 
-     Parameters:
-         target: Target string to check.
-@@ -2336,7 +2531,8 @@ def is_accelerator[target: StringSlice]() -> Bool:
- def is_accelerator(target: StringSlice) -> Bool:
-     """Checks if the target is an accelerator (runtime version).
- 
--    True for any non-CPU compute target -- GPUs and NPUs alike.
-+    True for programmable accelerator targets. Managed graph backends such as
-+    Core AI are not accelerator kernels and must be dispatched explicitly.
- 
-     Args:
-         target: Target string to check.
-@@ -2354,7 +2550,8 @@ def is_valid_target[target: StringSlice]() -> Bool:
-         target: Target string to check.
- 
-     Returns:
--        True if the target is valid (CPU, GPU, or NPU), False otherwise.
-+        True if the target has an implemented standard operation-dispatch
-+        contract (CPU, GPU, or NPU), False otherwise.
-     """
-     return is_valid_target(target)
- 
-@@ -2366,6 +2563,7 @@ def is_valid_target(target: StringSlice) -> Bool:
-         target: Target string to check.
- 
-     Returns:
--        True if the target is valid (CPU, GPU, or NPU), False otherwise.
-+        True if the target has an implemented standard operation-dispatch
-+        contract (CPU, GPU, or NPU), False otherwise.
-     """
-     return is_cpu(target) or is_accelerator(target)
+@@ -2215,24 +2232,14 @@ def _get_info_from_target[target_arch0: StaticString]() -> GPUInfo:
+         return materialize[Radeon9070]()
+     elif target_arch == "apple-m1":
+         return materialize[MetalM1]()
+-    elif target_arch == "apple-m1-metal4":
+-        return materialize[MetalM1Metal4]()
+     elif target_arch == "apple-m2":
+         return materialize[MetalM2]()
+-    elif target_arch == "apple-m2-metal4":
+-        return materialize[MetalM2Metal4]()
+     elif target_arch == "apple-m3":
+         return materialize[MetalM3]()
+-    elif target_arch == "apple-m3-metal4":
+-        return materialize[MetalM3Metal4]()
+     elif target_arch == "apple-m4":
+         return materialize[MetalM4]()
+-    elif target_arch == "apple-m4-metal4":
+-        return materialize[MetalM4Metal4]()
+     elif target_arch == "apple-m5":
+         return materialize[MetalM5]()
+-    elif target_arch == "apple-m5-metal4":
+-        return materialize[MetalM5Metal4]()
+     # "cuda" means generic CUDA — use runtime GPU detection.
+     elif target_arch == "cuda":
+         return _get_info_from_target[_accelerator_arch()]()
 diff --git a/mojo/stdlib/std/io/file.mojo b/mojo/stdlib/std/io/file.mojo
 index 65235212ef..c05c31ef8b 100644
 --- a/mojo/stdlib/std/io/file.mojo
@@ -5666,7 +5502,7 @@ index 80f7faad24..6eeb0b7ac8 100644
              self.value
          )
 diff --git a/mojo/stdlib/std/sys/info.mojo b/mojo/stdlib/std/sys/info.mojo
-index 132e3af2f2..9ee2e13b45 100644
+index 132e3af2f2..faa9e6da8d 100644
 --- a/mojo/stdlib/std/sys/info.mojo
 +++ b/mojo/stdlib/std/sys/info.mojo
 @@ -189,6 +189,26 @@ struct CompilationTarget[value: _TargetType = _current_target()](
@@ -5755,17 +5591,38 @@ index 132e3af2f2..9ee2e13b45 100644
      elif CompilationTarget.is_linux() and linux:
          return materialize[linux.value()]()
      else:
-@@ -916,7 +960,9 @@ def is_apple_gpu() -> Bool:
+@@ -916,19 +960,26 @@ def is_apple_gpu() -> Bool:
      Returns:
          True if the triple target is Apple GPU and False otherwise.
      """
 -    return is_triple["air64-apple-macosx"]()
-+    return is_triple["air64-apple-macosx"]() or is_triple[
-+        "air64-apple-ios15.0"
-+    ]() or is_triple["air64-apple-ios15.0-simulator"]()
++    # These are the complete set of AIR triples produced by the standard
++    # Apple GPU targets above.  Keep this exhaustive until KGEN exposes a
++    # reliable target-triple architecture predicate for AIR.
++    return (
++        is_triple["air64-apple-macosx"]()
++        or is_triple["air64-apple-ios15.0"]()
++        or is_triple["air64-apple-ios15.0-simulator"]()
++    )
  
  
  @always_inline("nodebug")
+ def is_apple_gpu[subarch: StaticString]() -> Bool:
+-    """Returns True if the target triple of the compiler is `air64-apple-macosx`
+-    and we are compiling for the specified sub-architecture and False otherwise.
++    """Returns True for an Apple GPU target with the specified
++    sub-architecture and False otherwise.
+ 
+     Parameters:
+-        subarch: The subarchitecture (e.g. sm_80).
++        subarch: The Apple GPU subarchitecture (e.g. apple-m1).
+ 
+     Returns:
+-        True if the triple target is cuda and False otherwise.
++        True if the target is an Apple GPU with this subarchitecture.
+     """
+     return is_apple_gpu() and CompilationTarget._is_arch[subarch]()
+ 
 diff --git a/mojo/stdlib/std/time/time.mojo b/mojo/stdlib/std/time/time.mojo
 index dcb8370f58..d7c3bb3264 100644
 --- a/mojo/stdlib/std/time/time.mojo

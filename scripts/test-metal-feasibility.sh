@@ -8,7 +8,6 @@ stdlib_path="${upstream_root}/mojo/stdlib"
 max_path="${upstream_root}/max/mojo"
 probe_path="${project_root}/probes/IOSMetalVectorAddProbe.mojo"
 harness_path="${project_root}/tests/MetalHostVectorAddSmoke.c"
-target_contract_probe_path="${project_root}/probes/IOSMetalTargetContractProbe.mojo"
 output_root="${project_root}/build/metal-gate"
 compiler_state_root="${MOJO_IOS_METAL_COMPILER_STATE_ROOT:-${project_root}/build/compiler-state/metal}"
 device_context_source="${upstream_root}/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c"
@@ -49,7 +48,6 @@ test -d "${stdlib_path}/std"
 test -d "${max_path}/max"
 test -f "${probe_path}"
 test -f "${harness_path}"
-test -f "${target_contract_probe_path}"
 test -f "${device_context_source}"
 test -f "${apple_work_queue_source}"
 test -f "${metal_context_source}"
@@ -89,16 +87,24 @@ compile_mojo_probe() {
   fi
 }
 
-compile_target_contract() {
-  local target_triple="$1"
-  local output_path="$2"
-  "${compiler_command[@]}" build "${target_contract_probe_path}" \
-    -I "${stdlib_path}" \
-    --emit object \
-    --target-triple "${target_triple}" \
-    --target-cpu apple-m1 \
-    --optimization-level 3 \
-    -o "${output_path}"
+reject_unimplemented_metal4_target() {
+  if rg -n '\{"apple-m[1-5]-metal4"|StaticString\("apple-m[1-5]-metal4"\)|comptime MetalM[1-5]Metal4|arch_name="apple-m[1-5]-metal4"' \
+    "${upstream_root}/KGEN/lib/Target/Metal/MetalTraits.cpp" \
+    "${upstream_root}/mojo/stdlib/std/gpu/host/info.mojo"; then
+    echo "Metal 4 is still advertised by the AIR 2.4 backend" >&2
+    exit 1
+  fi
+}
+
+reject_unsupported_air_type() {
+  local air_pass="${upstream_root}/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp"
+  local metal_backend="${upstream_root}/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp"
+  if rg -n 'report_fatal_error' "${air_pass}"; then
+    echo "Metal AIR still aborts on unsupported IR" >&2
+    exit 1
+  fi
+  rg -Fq 'recordMetalAIRLoweringError' "${air_pass}"
+  test "$(rg -c 'getMetalAIRLoweringError\(module\)' "${metal_backend}")" = 2
 }
 
 compile_runtime_variant() {
@@ -137,8 +143,8 @@ compile_runtime_variant() {
     -o "${output_root}/Globals-${variant_name}.o"
 }
 
-compile_target_contract arm64-apple-ios15.0 \
-  "${output_root}/IOSMetalTargetContract.o"
+reject_unimplemented_metal4_target
+reject_unsupported_air_type
 compile_mojo_probe arm64-apple-ios15.0 apple-m1 \
   "${output_root}/IOSMetalVectorAddProbe.o"
 compile_runtime_variant iphoneos iphoneos arm64-apple-ios15.0
@@ -158,8 +164,6 @@ if nm -u "${output_root}/IOSMetalVectorAddProbe.dylib" | rg -q AsyncRT_; then
   exit 1
 fi
 
-compile_target_contract arm64-apple-ios15.0-simulator \
-  "${output_root}/IOSMetalTargetContract-simulator.o"
 compile_mojo_probe arm64-apple-ios15.0-simulator apple-m1 \
   "${output_root}/IOSMetalVectorAddProbe-simulator.o"
 compile_runtime_variant iphonesimulator iphonesimulator \
@@ -186,8 +190,6 @@ else
   echo "set MOJO_IOS_METAL_SIMULATOR_ID to execute the linked Metal probe in a booted simulator"
 fi
 
-compile_target_contract arm64-apple-macosx15.0 \
-  "${output_root}/MetalTargetContract-macos.o"
 compile_mojo_probe arm64-apple-macosx15.0 apple-m1 \
   "${output_root}/MetalVectorAddProbe-macos.o"
 compile_runtime_variant macos macosx arm64-apple-macosx15.0

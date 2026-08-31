@@ -66,17 +66,15 @@ do not create an unvalidated second status store.
 
 ## M1: stable distribution gate
 
-1. Split release runtime objects from `ASYNCRT_ENABLE_TESTING` instrumented
-   objects and make accidental packaging impossible by path and name.
-2. Add archive-wide forbidden Mojo/compiler/JIT content checks.
-3. Audit Mach-O platforms, architectures, minimum OS, load commands, symbols,
+1. Add archive-wide forbidden Mojo/compiler/JIT content checks.
+2. Audit Mach-O platforms, architectures, minimum OS, load commands, symbols,
    dependencies, entitlements, and private APIs.
-4. Generate and verify Required Reason API and privacy-manifest coverage.
-5. Add license notices, dependency/SBOM inventory, provenance, artifact hashes,
+3. Generate and verify Required Reason API and privacy-manifest coverage.
+4. Add license notices, dependency/SBOM inventory, provenance, artifact hashes,
    and XCFramework signing.
-6. Build and sign a reference CPU/Metal application with the stable accepted
+5. Build and sign a reference CPU/Metal application with the stable accepted
    Xcode/SDK, then pass Xcode App Store validation.
-7. Record TestFlight acceptance as a distinct later evidence stage.
+6. Record TestFlight acceptance as a distinct later evidence stage.
 
 Core AI remains outside this stable release gate until its Apple toolchain is
 accepted for production submission and its own device/package gates pass.

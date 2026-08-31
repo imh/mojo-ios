@@ -196,53 +196,11 @@ static void asyncrt_test_coreai_device_context(void) {
   void *context = NULL;
   const char *error_message =
       AsyncRT_DeviceContext_create(&context, "coreai", 0);
-  assert(error_message == NULL);
-  assert(context != NULL);
-
-  AsyncRTStringRef api = {0};
-  AsyncRT_DeviceContext_deviceApi(&api, context);
-  assert(api.data != NULL);
-  assert(api.length == 6);
-  assert(memcmp(api.data, "coreai", 6) == 0);
-
-  int32_t attribute = 0;
-  error_message = AsyncRT_DeviceContext_getAttribute(&attribute, context, 0);
   assert(error_message != NULL);
   assert(strstr(error_message, "Core AI") != NULL);
+  assert(strstr(error_message, "not implemented") != NULL);
   AsyncRT_DeviceContext_strfree(error_message);
-
-  void *buffer = NULL;
-  void *buffer_data = NULL;
-  error_message = AsyncRT_DeviceContext_createBuffer_async(
-      &buffer, &buffer_data, context, 6, sizeof(float));
-  assert(error_message == NULL);
-  assert(buffer != NULL);
-  assert(buffer_data != NULL);
-  assert(AsyncRT_DeviceBuffer_bytesize(buffer) == 6 * (int64_t)sizeof(float));
-  const float input[6] = {1, 2, 3, 4, 5, 6};
-  error_message = AsyncRT_DeviceContext_HtoD_async(context, buffer, input);
-  assert(error_message == NULL);
-  float copied_input[6] = {0};
-  error_message =
-      AsyncRT_DeviceContext_DtoH_async(context, copied_input, buffer);
-  assert(error_message == NULL);
-  assert(memcmp(input, copied_input, sizeof(input)) == 0);
-  AsyncRT_DeviceBuffer_retain(buffer);
-  AsyncRT_DeviceBuffer_release(buffer);
-  AsyncRT_DeviceBuffer_release(buffer);
-
-  void *function = NULL;
-  error_message = AsyncRT_DeviceContext_loadFunction(
-      &function, context, "module", "kernel", "data", 4, 0, "none", 3);
-  assert(error_message != NULL);
-  assert(strstr(error_message, "Core AI") != NULL);
-  assert(strstr(error_message, "device-function") != NULL);
-  AsyncRT_DeviceContext_strfree(error_message);
-  assert(function == NULL);
-
-  error_message = AsyncRT_DeviceContext_synchronize(context);
-  assert(error_message == NULL);
-  AsyncRT_DeviceContext_release(context);
+  assert(context == NULL);
 }
 
 int main(void) {
@@ -318,7 +276,7 @@ int main(void) {
 
   AsyncRT_DeviceContext_release(context);
   puts("MOJO_IOS_ASYNCRT_HOST_PASS language_async=execute-chain-andthen-timeout "
-       "coreai_context=buffer-only-no-graph-submission "
+       "coreai_context=not-implemented "
        "device_context_tasks=64 destroyed_coroutines=64 "
        "peak_concurrency_gt=1");
   return 0;
