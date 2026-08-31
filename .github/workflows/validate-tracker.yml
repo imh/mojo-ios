@@ -1,0 +1,33 @@
+name: Validate tracker
+
+on:
+  pull_request:
+    paths:
+      - AGENTS.md
+      - README.md
+      - pixi.toml
+      - docs/**
+      - scripts/**tracker*
+      - scripts/install-git-hooks.sh
+      - .githooks/**
+      - .github/workflows/validate-tracker.yml
+  push:
+    paths:
+      - AGENTS.md
+      - README.md
+      - pixi.toml
+      - docs/**
+      - scripts/**tracker*
+      - scripts/install-git-hooks.sh
+      - .githooks/**
+      - .github/workflows/validate-tracker.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/verify-tracker-structure.sh

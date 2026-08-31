@@ -33,6 +33,7 @@ build-coreai-mvp-resources = "./scripts/build-coreai-mvp-resources.sh"
 build-coreai-device-smoke = "./scripts/build-coreai-device-smoke.sh"
 test-coreai-device = "./scripts/test-coreai-device.sh"
 verify-tracker = "./scripts/verify-tracker-structure.sh"
+install-git-hooks = "./scripts/install-git-hooks.sh"
 
 [dependencies]
 mojo = ">=1.0.0,<2"

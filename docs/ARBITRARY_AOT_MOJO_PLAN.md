@@ -3,10 +3,10 @@
 This is the canonical implementation plan for making ordinary ahead-of-time
 Mojo libraries usable from Swift in App Store-distributed iOS and iPadOS apps.
 It defines the destination, the gap taxonomy, the evidence model, and the order
-of work. [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) remains the canonical
-current-status inventory until milestone M0 replaces it with a validated
-machine-readable manifest. [ROADMAP.md](ROADMAP.md) is the shorter execution
-view of the milestones in this document.
+of work. The GitHub task-list hierarchy rooted at
+[CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) is the canonical current-status
+inventory. [ROADMAP.md](ROADMAP.md) is the shorter execution view of the
+milestones in this document.
 
 ## Objective
 
@@ -105,8 +105,8 @@ separate.
 
 ## Gap workstreams
 
-Stable capability IDs in [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) identify
-the individual promises. Work is grouped into the following tracks.
+The scoped branches in [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) identify
+the current promises. Work is grouped into the following tracks.
 
 ### 1. Compiler and CPU language conformance
 
@@ -156,11 +156,11 @@ Unicode, diagnostics, reflection, compile-time facilities, Python, and
 accelerator host APIs. Audit every implemented system call for deployment
 availability, sandbox behavior, and Required Reason API consequences.
 
-The MAX branch begins with `max.algorithm.parallelize`, the backend-specific
-Metal and Core AI branches, and an explicit `not decomposed yet` remainder for
-all other public MAX libraries, algorithms, tensor/graph operations, device
-selection, and runtime behavior. Unpack only the branch reached by current
-work; do not infer broad MAX support from a neighboring passing operation.
+The MAX branch begins with `max.algorithm.parallelize` and the backend-specific
+Metal and Core AI branches. Broader public MAX libraries, algorithms,
+tensor/graph operations, device selection, and runtime behavior remain one
+unchecked scope until finer tracking is useful. Do not infer broad MAX support
+from a neighboring passing operation.
 
 ### 4. Swift/C ABI and library composition
 
@@ -270,8 +270,8 @@ SDK, Metal toolchain, and Core AI authoring package as one compatibility tuple.
 
 ## Target and hardware lanes
 
-The tracking manifest introduced by M0 must name target lanes instead of using
-an unqualified `device tested` flag.
+Tracker evidence must name target lanes instead of using an unqualified
+`device tested` flag.
 
 | Lane | Purpose | Initial requirement |
 | --- | --- | --- |
@@ -288,90 +288,57 @@ must not raise the base CPU/Metal minimum silently.
 
 ## Tracking model
 
-Tracking is a recursive progressive-disclosure hierarchy, not a requirement to
-flatten every future Mojo and MAX surface into one manifest immediately. The
-root must cover the whole objective at a reasonable subsystem boundary. Every
-part of a node's scope is then accounted for by one of the following:
+Tracking is a recursive progressive-disclosure hierarchy, not a flat exhaustive
+inventory. The only status source is Markdown rooted at
+[CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md), using this form:
 
-1. contains concrete child items;
-2. delegates to a deeper tracker that follows the same rule; or
-3. says **not decomposed yet**, which is an explicit no-support claim for the
-   undecomposed remainder.
-
-Nodes may mix proved or actionable children with a `not decomposed yet`
-remainder. As work reaches a node, unpack only that node. Every deeper tracker
-must have one canonical parent, so nothing can disappear into an orphan plan
-or become a second status source.
-
-Milestone M0 introduces three TOML sources that Python can read with the
-standard-library `tomllib` module:
-
-```text
-tracking/capabilities.toml
-tracking/targets.toml
-tracking/gates.toml
+```markdown
+- [x] **Capability**: The declared scope is complete. [evidence](GATE.md)
+- [ ] **Capability family**: The declared scope is incomplete. [tracker](trackers/family.md)
+  - [x] **Narrow child**: This child is complete.
+  - [ ] **Narrow child**: This child is incomplete.
 ```
 
-Do not create these as an unvalidated duplicate of the Markdown ledger. M0 is
-complete only when the validator and generated views land in the same change.
-Until then, [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) remains canonical.
+`[x]` means the declared scope is complete, whether supported or deliberately
+rejected; the description says which. `[ ]` means it is incomplete. The
+description always describes the real capability and current boundary.
+Decomposition is optional structure, never a third state: add nested items or
+one linked tracker only when finer tracking is useful. A broad unchecked leaf
+is valid and can be unpacked later.
 
-Each actionable leaf records:
+A checked parent cannot contain an unchecked descendant. An unchecked parent
+may mix checked and unchecked children, so its row gives the answer without
+opening its tracker while its children explain why. Each tracker file has one
+canonical parent and remains small enough to scan at a glance. Issues, plans,
+gates, and cross-references do not duplicate status.
 
-- stable ID, parent node, and user-visible surface;
-- the normal lowering/runtime path;
-- disposition: `supported`, `rejected`, or `planned`;
-- maturity: `specified`, `implemented`, `host_verified`, `sim_verified`,
-  `device_verified`, or `release_validated`;
-- blocker owner: `none`, `project`, `upstream`, `apple`, or `toolchain`;
-- applicable target lanes and minimum availability;
-- positive and negative gates;
-- required diagnostic for rejected operations;
-- App Store/privacy consequences; and
-- upstream patch, issue, or commit ownership.
+As a branch becomes actionable, its row or linked gate should progressively
+record the standard Mojo/MAX surface, normal compiler/library/runtime path,
+blocker, applicable lanes, evidence or diagnostic, next completion gate, and
+upstream ownership. Missing facts are written as `not recorded yet`, not
+guessed. Summary rows link to detail instead of repeating all metadata.
 
-Every non-leaf records its stable scope and its child items, delegated tracker,
-or explicit `not decomposed yet` remainder. The validator does not require an
-exhaustive leaf inventory on day one; it requires complete root coverage and
-honest disposition at every level currently exposed.
-
-The validator must fail when:
-
-1. a document, issue, or gate refers to an unknown capability ID;
-2. a tracker node has neither children, a valid delegation, nor an explicit
-   `not decomposed yet` disposition;
-3. a supported capability lacks its required evidence;
-4. a rejected target-known capability lacks a compile-fail diagnostic;
-5. a planned backend operation can silently fall back;
-6. a required target or hardware lane is absent;
-7. evidence was produced with a mismatched compatibility tuple; or
-8. a generated view differs from the manifest.
-
-Generated views replace duplicated hand-maintained status prose:
-
-- capability ledger grouped by subsystem;
-- gap report grouped by blocker and owner;
-- target evidence matrix;
-- release support contract; and
-- roadmap dependency view.
-
-Issues track active implementation work. They do not redefine whether a
-capability is supported.
+The validator must fail on malformed task rows, broken pointers, orphan or
+multiply-parented tracker files, cycles, checked parents with unchecked
+descendants, duplicate sibling names, absent top-level coverage divisions, or
+oversized tracker files. The pre-commit hook validates the exact staged
+snapshot; CI must run the same command. No TOML, YAML, database, or generated
+status view shadows the Markdown hierarchy.
 
 ## Milestones
 
 ### M0: truthful tracking foundation
 
-- Add and validate the three tracking manifests.
-- Give every umbrella node concrete children, a delegated tracker, or an
-  explicit `not decomposed yet` remainder; split active nodes into atomic
-  promises only as far as current implementation and evidence require.
-- Import every current positive and negative probe.
-- Generate the ledger, gap report, evidence matrix, and support contract.
-- Require capability IDs in all gate output.
+- Keep the root task list at a complete, glanceable subsystem division.
+- Split current detail into small, singly-parented Markdown task trackers.
+- Validate task syntax, links, graph structure, status roll-up, and root
+  coverage recursively.
+- Run the same validator against the exact staged snapshot and in CI.
+- Link current positive and negative gates from the affected branches as those
+  branches are unpacked.
 
 Exit: there is one status source, every present claim is scoped to its evidence,
-and no current capability is lost during migration.
+and fresh sessions cannot silently bypass or fork the tracker hierarchy.
 
 ### M1: stable distribution gate
 

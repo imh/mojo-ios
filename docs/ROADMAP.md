@@ -7,7 +7,7 @@ tensor-graph execution through upstream-shaped compiler and runtime paths.
 - [ARBITRARY_AOT_MOJO_PLAN.md](ARBITRARY_AOT_MOJO_PLAN.md) is the canonical
   destination, gap taxonomy, tracking design, and milestone definition.
 - [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) is the canonical current-status
-  inventory until M0 replaces it with generated views.
+  task-list hierarchy.
 - [APP_STORE_DISTRIBUTION_GATE.md](APP_STORE_DISTRIBUTION_GATE.md) defines the
   release evidence ladder.
 
@@ -35,7 +35,7 @@ ANE interface, or shipped Mojo JIT.
 
 | Milestone | Status | Exit gate |
 | --- | --- | --- |
-| M0: truthful tracking foundation | **next** | One validated machine-readable status source with generated views and no lost current evidence |
+| M0: truthful tracking foundation | **complete** | One recursively validated Markdown task-list hierarchy with no lost current evidence |
 | M1: stable distribution gate | **specified** | Stable-toolchain CPU/Metal release archive passes local audits and Xcode validation |
 | M2: CPU compiler and runtime closure | **pending** | Portable CPU language/runtime corpus is proved or explicitly rejected across the base matrix |
 | M3: standard library and production ABI | **pending** | Complete target-sensitive inventory and production ownership/error/callback contract |
@@ -48,22 +48,19 @@ ANE interface, or shipped Mojo JIT.
 
 Work in order:
 
-1. Add `tracking/capabilities.toml`, `tracking/targets.toml`, and
-   `tracking/gates.toml` together with a validator.
-2. Give every umbrella row concrete children, a delegated tracker, or an
-   explicit `not decomposed yet` remainder. Split the active/proved portion
-   into atomic, target-scoped capabilities as work reaches it.
-3. Import every present positive test, negative diagnostic, toolchain
-   prerequisite, and hardware result.
-4. Generate the capability ledger, gap report, target evidence matrix, support
-   contract, and roadmap views.
-5. Require structured gate output containing capability IDs, target lane,
-   compatibility tuple, artifact hashes, and result.
-6. Fail CI on missing evidence, unknown IDs, stale generated files, unnamed
-   rejection, or silent fallback.
+1. Keep a complete, glanceable root task list for the project's major scopes.
+2. Move current detail into small Markdown trackers linked from exactly one
+   canonical parent.
+3. Validate task syntax, pointers, graph structure, checked-parent roll-up,
+   root coverage, and file size recursively.
+4. Run the validator against the exact staged snapshot in the repository's
+   pre-commit hook.
+5. Run the same validator in authoritative CI.
+6. Link gates, target lanes, compatibility tuples, artifacts, and diagnostics
+   from branches as those branches are progressively unpacked.
 
-Until all six land together, the Markdown capability ledger remains canonical;
-do not create an unvalidated second status store.
+Markdown remains the only status store. M0 must not add a TOML, YAML, database,
+or generated status view beside it.
 
 ## M1: stable distribution gate
 
@@ -167,8 +164,8 @@ substitute.
 2. Keep Core AI graph conversion in a later separate patch series.
 3. Rebase the compiler revision, stdlib, MAX, Apple SDK, Metal toolchain, and
    Core AI package as one reported compatibility tuple.
-4. Sign release artifacts and publish deterministic hashes, notices, and
-   supported capability/target manifests.
+4. Sign release artifacts and publish deterministic hashes, notices, and a
+   release support statement linked to the canonical tracker.
 5. Run the complete release matrix before changing the support contract.
 
 ## Work selection rule
@@ -183,9 +180,9 @@ When a milestone is blocked, record the precise capability and blocker, then
 advance only work that does not weaken architectural invariants. Do not broaden
 support claims merely because a neighboring feature passes.
 
-The next implementation work is M0. M1's release-runtime split and archive
-audits follow immediately; additional isolated accelerator features wait until
-the tracker can represent and release-gate them.
+The next implementation work is M1's stable distribution gate. Additional
+isolated accelerator features wait until they fit the tracker and release
+evidence structure established by M0.
 
 ## Toolchain policy
 

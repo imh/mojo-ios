@@ -30,24 +30,35 @@ an iOS special case look complete by introducing a parallel abstraction.
 
 ## Progressive tracking is required
 
-The canonical tracker root is the **Top-level coverage index** in
-`docs/CAPABILITY_LEDGER.md`. The destination and tracking rules live in
-`docs/ARBITRARY_AOT_MOJO_PLAN.md`; the ledger remains the current status source
-until validated generated manifests replace it.
+The canonical status source is the GitHub task-list hierarchy rooted at
+`docs/CAPABILITY_LEDGER.md`. The destination and milestone plan live in
+`docs/ARBITRARY_AOT_MOJO_PLAN.md`, but plans and issues never redefine current
+support status.
 
-Tracking uses recursive progressive disclosure. It is intentionally not one
-flat exhaustive list. Every tracker node must have a stable scope, and every
-part of that scope must be accounted for by one of these dispositions:
+Use only this terse tracker form:
 
-1. **Items here**: the node contains concrete child capabilities or work items.
-2. **Delegated**: the node points to one or more deeper tracker documents or
-   sections that obey this same rule.
-3. **Not decomposed yet**: the node explicitly says that its remaining surface
-   has not been inventoried. This means no support is claimed for that surface.
+```markdown
+- [x] **Capability**: Declared scope is complete. [evidence](gate.md)
+- [ ] **Larger capability**: Work remains. [tracker](trackers/child.md)
+  - [x] **Completed child**: This narrower scope is complete.
+  - [ ] **Open child**: This narrower scope is incomplete.
+```
 
-A node may contain current items and also retain a `not decomposed yet`
-remainder. It may not use `other`, `remaining`, `etc.`, or similarly open-ended
-language unless that remainder is explicitly marked `not decomposed yet`.
+- `[x]` means the item's declared scope is complete. Its description must say
+  whether the result is supported or deliberately rejected.
+- `[ ]` means the item's declared scope is not complete.
+- Description text describes the capability and its current boundary. It must
+  not use decomposition state as a substitute for a real description.
+- Decomposition is optional structure, not a status or disposition. Add nested
+  children or one linked `[tracker](...)` file only when finer tracking is
+  useful. A leaf may remain broad and unchecked.
+- A checked item may not have an unchecked descendant, including descendants
+  in a linked tracker. An unchecked item may mix checked and unchecked
+  children.
+- A branch may put children directly below it or delegate to one tracker file,
+  but not both. The linked file uses the same task-list form.
+- Keep each tracker file glanceable. Split a branch into a linked tracker when
+  the file would exceed roughly 10–15 task rows.
 
 The root coverage index must always cover, directly or by delegation:
 
@@ -62,14 +73,13 @@ The root coverage index must always cover, directly or by delegation:
 - AOT artifacts, packaging, and App Store distribution; and
 - upstream patch ownership, compatibility, and tracking evidence.
 
-When work reveals more detail, unpack only the affected node. Replace its
-`not decomposed yet` remainder with child items or a delegated tracker, while
-leaving unrelated nodes at their existing level. Do not create an orphan
-checklist: every new tracker must be linked from exactly one parent in the
-canonical hierarchy, though other documents may cross-reference it.
+When work reveals more detail, unpack only the affected unchecked node while
+leaving unrelated branches at their existing level. Every tracker file must be
+reachable from exactly one parent in the canonical hierarchy. Other documents
+may cross-reference it, but may not maintain a duplicate status list.
 
-When a node is unpacked into an actionable leaf, it must state—directly or in
-its canonically delegated gate—enough to judge it without inference:
+When a node becomes actionable, its description and links must expose enough to
+judge it without inference:
 
 - the standard Mojo/MAX surface or upstream test family;
 - the normal compiler/library/runtime path;
@@ -80,28 +90,28 @@ its canonically delegated gate—enough to judge it without inference:
 - upstream patch or issue ownership when known.
 
 If one of those facts has not been established, write `not recorded yet`
-instead of guessing. During the Markdown-to-manifest M0 transition, existing
-summary rows may remain non-leaf nodes as long as their undecomposed remainder
-or delegated evidence is explicit.
-
-Issues and plans may schedule work, but they do not redefine support status.
-Never create a second hand-maintained status source. When machine-readable
-tracking lands, generated views replace Markdown status tables atomically.
+instead of guessing. Do not copy all metadata into every summary row; link to
+the gate or narrower tracker that records it. Never create a second
+hand-maintained status source.
 
 Before completing tracker-related work, verify:
 
 1. every top-level division is still present;
 2. every pointer resolves;
-3. every leaf is actionable, delegated, or explicitly not decomposed yet;
+3. every row has only a checkbox, a stable scoped name, a real description,
+   and optional children or one tracker link;
 4. no broad parent is marked supported from evidence for only one child;
 5. unsupported target-known behavior has a named normal failure and no
    fallback; and
 6. documentation changes do not contradict current gates or artifacts.
 
 Run `./scripts/verify-tracker-structure.sh` after every tracker or tracker-link
-change. This is the required interim structural gate. Milestone M0 must replace
-its hard-coded Markdown assertions with validation of the hierarchical
-machine-readable manifests without weakening these checks.
+change. The repository-managed pre-commit hook runs the same verifier against
+the exact staged snapshot whenever tracker-related files change. On a fresh
+checkout, install it with `pixi run install-git-hooks`; do not assume Git copied
+or activated hooks automatically. This is the required structural gate.
+Milestone M0 completes it with recursive Markdown validation and CI; it does
+not introduce a parallel TOML, YAML, or generated status source.
 
 ## Incomplete implementation style
 

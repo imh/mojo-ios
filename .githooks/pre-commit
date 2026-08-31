@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+project_root="$(git rev-parse --show-toplevel)"
+cd "${project_root}"
+
+tracker_change_present=false
+while IFS= read -r -d '' staged_path; do
+  case "${staged_path}" in
+  AGENTS.md | README.md | pixi.toml | docs/* | \
+    .githooks/* | .github/workflows/*tracker* | scripts/*tracker* | \
+    scripts/install-git-hooks.sh)
+    tracker_change_present=true
+    break
+    ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMRD -z)
+
+if [[ "${tracker_change_present}" == false ]]; then
+  exit 0
+fi
+
+snapshot_root="$(mktemp -d "${TMPDIR:-/tmp}/mojo-ios-precommit.XXXXXX")"
+case "${snapshot_root}" in
+"${TMPDIR:-/tmp}"/mojo-ios-precommit.*) ;;
+*)
+  echo "refusing to use unexpected pre-commit snapshot path: ${snapshot_root}" >&2
+  exit 1
+  ;;
+esac
+
+cleanup_snapshot() {
+  rm -rf -- "${snapshot_root}"
+}
+trap cleanup_snapshot EXIT
+
+# Validate the index exactly as it will be committed. This avoids both false
+# passes from unstaged fixes and false failures from unrelated working-tree
+# edits.
+git checkout-index --all --prefix="${snapshot_root}/"
+
+if [[ ! -x "${snapshot_root}/scripts/verify-tracker-structure.sh" ]]; then
+  echo "the staged tracker verifier is missing or not executable" >&2
+  exit 1
+fi
+
+"${snapshot_root}/scripts/verify-tracker-structure.sh"
