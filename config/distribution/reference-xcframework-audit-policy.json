@@ -1,0 +1,45 @@
+{
+  "allowed_dependencies": [
+    "/System/Library/Frameworks/Foundation.framework/Foundation",
+    "/System/Library/Frameworks/Metal.framework/Metal",
+    "/System/Library/Frameworks/UIKit.framework/UIKit",
+    "/usr/lib/libSystem.B.dylib",
+    "/usr/lib/libc++.1.dylib",
+    "/usr/lib/libobjc.A.dylib"
+  ],
+  "artifact_kind": "xcframework",
+  "declared_accelerator_artifacts": [],
+  "embedded_metal_library_counts": {
+    "ios-arm64-simulator/libMojoIOSReference.a": 5,
+    "ios-arm64/libMojoIOSReference.a": 5
+  },
+  "expected_artifact_name": "MojoIOSReference.xcframework",
+  "expected_slices": [
+    {
+      "architectures": [
+        "arm64"
+      ],
+      "binary_type": "static_archive",
+      "identifier": "ios-arm64",
+      "minimum_os": "15.0",
+      "platform": "IOS"
+    },
+    {
+      "architectures": [
+        "arm64"
+      ],
+      "binary_type": "static_archive",
+      "identifier": "ios-arm64-simulator",
+      "minimum_os": "15.0",
+      "platform": "IOSSIMULATOR"
+    }
+  ],
+  "expected_toolchain": {
+    "iphoneos_sdk_build": "23F81a",
+    "metal_build_version": "17F109",
+    "xcode_build_version": "17F113"
+  },
+  "lane": "stable-reference-xcframework",
+  "require_signature": false,
+  "schema_version": 1
+}

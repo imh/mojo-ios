@@ -1,0 +1,50 @@
+{
+  "allowed_dependencies": [
+    "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
+    "/System/Library/Frameworks/Foundation.framework/Foundation",
+    "/System/Library/Frameworks/Metal.framework/Metal",
+    "/System/Library/Frameworks/UIKit.framework/UIKit",
+    "/usr/lib/libSystem.B.dylib",
+    "/usr/lib/libc++.1.dylib",
+    "/usr/lib/libobjc.A.dylib",
+    "/usr/lib/swift"
+  ],
+  "allowed_entitlements": [
+    "application-identifier",
+    "com.apple.developer.team-identifier",
+    "get-task-allow"
+  ],
+  "allowed_symbols": {
+    "Products/Applications/MojoIOSReferenceApp.app/MojoIOSReferenceApp": [
+      "_dlsym"
+    ]
+  },
+  "artifact_kind": "xcarchive",
+  "declared_accelerator_artifacts": [],
+  "embedded_metal_library_counts": {
+    "Products/Applications/MojoIOSReferenceApp.app/MojoIOSReferenceApp": 1
+  },
+  "expected_artifact_name": "MojoIOSReferenceApp.xcarchive",
+  "expected_bundle_identifier": "com.ianhorn.mojoios.reference",
+  "expected_slices": [
+    {
+      "architectures": [
+        "arm64"
+      ],
+      "binary_type": "mach_o",
+      "identifier": "Products/Applications/MojoIOSReferenceApp.app/MojoIOSReferenceApp",
+      "minimum_os": "15.0",
+      "platform": "IOS"
+    }
+  ],
+  "expected_team_identifier": "24D3YSDU5R",
+  "expected_toolchain": {
+    "iphoneos_sdk_build": "23F81a",
+    "metal_build_version": "17F109",
+    "xcode_build_version": "17F113"
+  },
+  "lane": "stable-reference-archive",
+  "require_signature": true,
+  "required_signing_authority_prefix": "Apple Development:",
+  "schema_version": 1
+}

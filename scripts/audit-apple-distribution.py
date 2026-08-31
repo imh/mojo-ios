@@ -101,13 +101,20 @@ SYMBOL_POLICIES = [
 ]
 
 ALLOWED_POLICY_KEYS = {
+    "allowed_entitlements",
     "allowed_dependencies",
+    "allowed_symbols",
     "artifact_kind",
     "declared_accelerator_artifacts",
+    "embedded_metal_library_counts",
+    "expected_bundle_identifier",
     "expected_artifact_name",
     "expected_slices",
+    "expected_team_identifier",
+    "expected_toolchain",
     "lane",
     "require_signature",
+    "required_signing_authority_prefix",
     "schema_version",
 }
 ALLOWED_SLICE_KEYS = {
@@ -211,8 +218,12 @@ def load_policy(path: Path) -> Dict[str, Any]:
         raise AuditError(f"unknown distribution policy keys: {unknown_keys}")
     if policy.get("schema_version") != 1:
         raise AuditError("distribution policy schema_version must be 1")
-    if policy.get("artifact_kind") not in {"xcframework", "xcarchive"}:
-        raise AuditError("artifact_kind must be xcframework or xcarchive")
+    if policy.get("artifact_kind") not in {
+        "app_bundle",
+        "xcframework",
+        "xcarchive",
+    }:
+        raise AuditError("artifact_kind must be app_bundle, xcframework, or xcarchive")
     if not isinstance(policy.get("expected_artifact_name"), str):
         raise AuditError("expected_artifact_name must be recorded")
     if not isinstance(policy.get("lane"), str):
@@ -226,6 +237,50 @@ def load_policy(path: Path) -> Dict[str, Any]:
             raise AuditError(f"{list_key} must be a list of strings")
         if len(policy[list_key]) != len(set(policy[list_key])):
             raise AuditError(f"{list_key} must not contain duplicates")
+    allowed_entitlements = policy.get("allowed_entitlements", [])
+    if not isinstance(allowed_entitlements, list) or not all(
+        isinstance(value, str) for value in allowed_entitlements
+    ):
+        raise AuditError("allowed_entitlements must be a list of strings")
+    if len(allowed_entitlements) != len(set(allowed_entitlements)):
+        raise AuditError("allowed_entitlements must not contain duplicates")
+    allowed_symbols = policy.get("allowed_symbols", {})
+    if not isinstance(allowed_symbols, dict) or not all(
+        isinstance(path, str)
+        and path
+        and isinstance(symbols, list)
+        and all(isinstance(symbol, str) and symbol for symbol in symbols)
+        and len(symbols) == len(set(symbols))
+        for path, symbols in allowed_symbols.items()
+    ):
+        raise AuditError("allowed_symbols must map paths to unique symbol lists")
+    embedded_metal_library_counts = policy.get("embedded_metal_library_counts", {})
+    if not isinstance(embedded_metal_library_counts, dict) or not all(
+        isinstance(path, str)
+        and path
+        and isinstance(count, int)
+        and not isinstance(count, bool)
+        and count >= 0
+        for path, count in embedded_metal_library_counts.items()
+    ):
+        raise AuditError(
+            "embedded_metal_library_counts must map paths to nonnegative integers"
+        )
+    expected_toolchain = policy.get("expected_toolchain", {})
+    allowed_toolchain_keys = {
+        "iphoneos_sdk_build",
+        "metal_build_version",
+        "xcode_build_version",
+    }
+    if not isinstance(expected_toolchain, dict):
+        raise AuditError("expected_toolchain must be an object")
+    unknown_toolchain_keys = sorted(set(expected_toolchain) - allowed_toolchain_keys)
+    if unknown_toolchain_keys:
+        raise AuditError(f"unknown expected-toolchain keys: {unknown_toolchain_keys}")
+    if not all(
+        isinstance(value, str) and value for value in expected_toolchain.values()
+    ):
+        raise AuditError("expected_toolchain values must be nonempty strings")
     expected_slices = policy.get("expected_slices", [])
     if not isinstance(expected_slices, list):
         raise AuditError("expected_slices must be a list")
@@ -249,6 +304,18 @@ def load_policy(path: Path) -> Dict[str, Any]:
         raise AuditError("expected slice identifiers must be unique")
     if policy["artifact_kind"] == "xcframework" and not expected_slices:
         raise AuditError("xcframework policy requires expected_slices")
+    if policy["artifact_kind"] in {"app_bundle", "xcarchive"}:
+        if len(expected_slices) != 1:
+            raise AuditError("xcarchive policy requires one application executable")
+        if expected_slices[0]["binary_type"] != "mach_o":
+            raise AuditError("xcarchive application executable must be Mach-O")
+        for string_key in (
+            "expected_bundle_identifier",
+            "expected_team_identifier",
+            "required_signing_authority_prefix",
+        ):
+            if not isinstance(policy.get(string_key), str) or not policy[string_key]:
+                raise AuditError(f"xcarchive policy requires {string_key}")
     return policy
 
 
@@ -380,6 +447,19 @@ def is_mach_o_data(data: bytes) -> bool:
     return len(data) >= 4 and data[:4] in MACH_O_MAGICS
 
 
+def count_embedded_metal_libraries(data: bytes) -> int:
+    count = 0
+    search_offset = 0
+    while True:
+        magic_offset = data.find(b"MTLB", search_offset)
+        if magic_offset < 0:
+            return count
+        version_offset = magic_offset + 4
+        if version_offset < len(data) and data[version_offset] < 0x20:
+            count += 1
+        search_offset = magic_offset + 1
+
+
 def architectures_for(path: Path) -> List[str]:
     output = run_tool(["xcrun", "lipo", "-archs", str(path)]).stdout.strip()
     return sorted(output.split())
@@ -459,8 +539,16 @@ def inspect_signing(path: Path) -> Dict[str, Any]:
         combine_output=True,
     )
     if completed.returncode != 0:
-        return {"signed": False}
-    signing: Dict[str, Any] = {"signed": True}
+        return {"signed": False, "valid": False}
+    verification = run_tool(
+        ["codesign", "--verify", "--strict", "--verbose=4", str(path)],
+        check=False,
+        combine_output=True,
+    )
+    signing: Dict[str, Any] = {
+        "signed": True,
+        "valid": verification.returncode == 0,
+    }
     for line in completed.stdout.splitlines():
         for field_name, output_name in (
             ("Identifier", "identifier"),
@@ -508,6 +596,9 @@ def inspect_mach_o(
         "build_versions": parse_build_versions(path),
         "container_path": container_path,
         "dependencies": parse_dependencies(path),
+        "embedded_metal_library_count": count_embedded_metal_libraries(
+            path.read_bytes()
+        ),
         "exported_symbols": parse_symbols(path, ["-gU"]),
         "load_commands": parse_load_commands(path),
         "sha256": content_sha256,
@@ -673,6 +764,9 @@ def audit_mach_o_policy(
 ) -> None:
     for image in mach_o_images:
         subject = image["subject"]
+        allowed_symbols = set(
+            policy.get("allowed_symbols", {}).get(image["container_path"], [])
+        )
         if image["archive_member"] is None and image["container_path"] not in (
             allowed_direct_mach_o_paths
         ):
@@ -686,6 +780,8 @@ def audit_mach_o_policy(
             set(image["exported_symbols"]) | set(image["undefined_symbols"])
         )
         for symbol in symbols:
+            if symbol in allowed_symbols:
+                continue
             for code, pattern, policy_name in SYMBOL_POLICIES:
                 if pattern.search(symbol):
                     add_violation(
@@ -920,8 +1016,76 @@ def audit_xcframework_structure(
     return allowed_direct_mach_o_paths
 
 
+def audit_application_bundle(
+    artifact_root: Path,
+    app_bundle: Path,
+    policy: Dict[str, Any],
+    mach_o_images: List[Dict[str, Any]],
+    violations: List[Violation],
+) -> Set[str]:
+    app_info_path = app_bundle / "Info.plist"
+    if not app_info_path.is_file():
+        add_violation(
+            violations,
+            "missing_application_info",
+            app_info_path.relative_to(artifact_root).as_posix(),
+            "application Info.plist is missing",
+        )
+        return set()
+    try:
+        app_info = plistlib.loads(app_info_path.read_bytes())
+    except plistlib.InvalidFileException as error:
+        raise AuditError(f"cannot parse application Info.plist: {error}") from error
+    actual_bundle_identifier = app_info.get("CFBundleIdentifier")
+    if actual_bundle_identifier != policy["expected_bundle_identifier"]:
+        add_violation(
+            violations,
+            "wrong_bundle_identifier",
+            app_info_path.relative_to(artifact_root).as_posix(),
+            f"expected {policy['expected_bundle_identifier']}, got "
+            f"{actual_bundle_identifier or 'not recorded'}",
+        )
+    executable_name = app_info.get("CFBundleExecutable")
+    if not isinstance(executable_name, str) or not executable_name:
+        add_violation(
+            violations,
+            "missing_application_executable_name",
+            app_info_path.relative_to(artifact_root).as_posix(),
+            "CFBundleExecutable is missing",
+        )
+        return set()
+    executable_relative_path = (
+        app_bundle.relative_to(artifact_root) / executable_name
+    ).as_posix()
+    expected_executable = policy["expected_slices"][0]
+    if executable_relative_path != expected_executable["identifier"]:
+        add_violation(
+            violations,
+            "wrong_application_executable",
+            executable_relative_path,
+            f"expected {expected_executable['identifier']}",
+        )
+    matching_images = [
+        image
+        for image in mach_o_images
+        if image["archive_member"] is None
+        and image["container_path"] == executable_relative_path
+    ]
+    if len(matching_images) != 1:
+        add_violation(
+            violations,
+            "invalid_application_executable_count",
+            executable_relative_path,
+            f"expected one Mach-O executable, found {len(matching_images)}",
+        )
+        return set()
+    validate_image_target(matching_images[0], expected_executable, violations)
+    return {executable_relative_path}
+
+
 def audit_xcarchive_structure(
     artifact_root: Path,
+    policy: Dict[str, Any],
     mach_o_images: List[Dict[str, Any]],
     violations: List[Violation],
 ) -> Set[str]:
@@ -934,16 +1098,152 @@ def audit_xcarchive_structure(
             "Products/Applications",
             f"expected one application bundle, found {len(app_bundles)}",
         )
-    return {
-        image["container_path"]
-        for image in mach_o_images
-        if image["archive_member"] is None
-        and image["container_path"].startswith("Products/Applications/")
+        return set()
+    return audit_application_bundle(
+        artifact_root, app_bundles[0], policy, mach_o_images, violations
+    )
+
+
+def audit_app_bundle_structure(
+    artifact_root: Path,
+    policy: Dict[str, Any],
+    mach_o_images: List[Dict[str, Any]],
+    violations: List[Violation],
+) -> Set[str]:
+    if artifact_root.suffix != ".app":
+        add_violation(
+            violations,
+            "invalid_application_bundle",
+            artifact_root.name,
+            "app_bundle artifact must have an .app suffix",
+        )
+    return audit_application_bundle(
+        artifact_root, artifact_root, policy, mach_o_images, violations
+    )
+
+
+def artifact_signing(artifact_root: Path, artifact_kind: str) -> Dict[str, Any]:
+    if artifact_kind in {"app_bundle", "xcframework"}:
+        return inspect_signing(artifact_root)
+    applications_root = artifact_root / "Products" / "Applications"
+    app_bundles = sorted(applications_root.glob("*.app"))
+    if len(app_bundles) != 1:
+        return {"signed": False, "valid": False}
+    return inspect_signing(app_bundles[0])
+
+
+def audit_embedded_metal_libraries(
+    mach_o_images: List[Dict[str, Any]],
+    policy: Dict[str, Any],
+    violations: List[Violation],
+) -> Dict[str, int]:
+    actual_counts: Dict[str, int] = {}
+    for relative_path, expected_count in sorted(
+        policy.get("embedded_metal_library_counts", {}).items()
+    ):
+        matching_images = [
+            image for image in mach_o_images if image["container_path"] == relative_path
+        ]
+        if not matching_images:
+            add_violation(
+                violations,
+                "missing_embedded_metal_container",
+                relative_path,
+                "declared embedded Metal Mach-O container is missing",
+            )
+            continue
+        actual_count = sum(
+            image["embedded_metal_library_count"] for image in matching_images
+        )
+        actual_counts[relative_path] = actual_count
+        if actual_count != expected_count:
+            add_violation(
+                violations,
+                "wrong_embedded_metal_library_count",
+                relative_path,
+                f"expected {expected_count}, got {actual_count}",
+            )
+    return actual_counts
+
+
+def audit_signing_policy(
+    signing: Dict[str, Any],
+    policy: Dict[str, Any],
+    violations: List[Violation],
+) -> None:
+    if policy["require_signature"] and not signing["signed"]:
+        add_violation(
+            violations,
+            "missing_required_signature",
+            policy["expected_artifact_name"],
+            "distribution policy requires a signature",
+        )
+        return
+    if policy["require_signature"] and not signing["valid"]:
+        add_violation(
+            violations,
+            "invalid_required_signature",
+            policy["expected_artifact_name"],
+            "distribution policy requires a valid signature",
+        )
+    if (
+        policy["artifact_kind"] not in {"app_bundle", "xcarchive"}
+        or not signing["signed"]
+    ):
+        return
+    actual_team_identifier = signing.get("team_identifier", "not recorded")
+    if actual_team_identifier != policy["expected_team_identifier"]:
+        add_violation(
+            violations,
+            "wrong_signing_team",
+            policy["expected_artifact_name"],
+            f"expected {policy['expected_team_identifier']}, got "
+            f"{actual_team_identifier}",
+        )
+    required_authority_prefix = policy["required_signing_authority_prefix"]
+    actual_authorities = signing.get("authorities", [])
+    if not any(
+        authority.startswith(required_authority_prefix)
+        for authority in actual_authorities
+    ):
+        add_violation(
+            violations,
+            "wrong_signing_authority",
+            policy["expected_artifact_name"],
+            f"expected authority prefix {required_authority_prefix}, got "
+            f"{actual_authorities or ['not recorded']}",
+        )
+    actual_entitlements = signing.get("entitlements", {})
+    undeclared_entitlements = sorted(
+        set(actual_entitlements) - set(policy.get("allowed_entitlements", []))
+    )
+    for entitlement in undeclared_entitlements:
+        add_violation(
+            violations,
+            "undeclared_entitlement",
+            policy["expected_artifact_name"],
+            entitlement,
+        )
+
+
+def audit_toolchain_policy(
+    toolchain: Dict[str, Any],
+    policy: Dict[str, Any],
+    violations: List[Violation],
+) -> None:
+    actual_values = {
+        "iphoneos_sdk_build": toolchain["iphoneos_sdk_build"],
+        "metal_build_version": toolchain["metal_toolchain"]["build_version"],
+        "xcode_build_version": toolchain["xcode_build_version"],
     }
-
-
-def artifact_signing(artifact_root: Path) -> Dict[str, Any]:
-    return inspect_signing(artifact_root)
+    for field, expected_value in sorted(policy.get("expected_toolchain", {}).items()):
+        if actual_values[field] != expected_value:
+            add_violation(
+                violations,
+                "toolchain_mismatch",
+                field,
+                f"expected {expected_value}, got {actual_values[field]}",
+            )
 
 
 def toolchain_tuple(policy_path: Path) -> Dict[str, Any]:
@@ -1060,10 +1360,18 @@ def toolchain_tuple(policy_path: Path) -> Dict[str, Any]:
             "status": "not recorded yet",
             "toolchain_identifier": "not recorded yet",
         }
+    xcode_version_lines = run_tool(["xcodebuild", "-version"]).stdout.splitlines()
+    if len(xcode_version_lines) < 2 or not xcode_version_lines[1].startswith(
+        "Build version "
+    ):
+        raise AuditError("xcodebuild -version did not report a build version")
+    selected_developer_directory = os.environ.get("DEVELOPER_DIR")
+    if selected_developer_directory is None:
+        selected_developer_directory = run_tool(["xcode-select", "-p"]).stdout.strip()
     return {
         "apple_clang": run_tool(["xcrun", "clang", "--version"]).stdout.splitlines()[0],
         "declared_upstream_revision": declared_upstream_revision,
-        "developer_directory": run_tool(["xcode-select", "-p"]).stdout.strip(),
+        "developer_directory": str(Path(selected_developer_directory).resolve()),
         "iphoneos_sdk_build": run_tool(
             ["xcrun", "--sdk", "iphoneos", "--show-sdk-build-version"]
         ).stdout.strip(),
@@ -1087,7 +1395,8 @@ def toolchain_tuple(policy_path: Path) -> Dict[str, Any]:
         "metal_toolchain": metal_toolchain,
         "upstream_checkout_revision": checkout_revision,
         "upstream_patches": patch_records,
-        "xcode": run_tool(["xcodebuild", "-version"]).stdout.splitlines(),
+        "xcode": xcode_version_lines,
+        "xcode_build_version": xcode_version_lines[1].removeprefix("Build version "),
     }
 
 
@@ -1123,19 +1432,22 @@ def main() -> int:
         allowed_direct_mach_o_paths = audit_xcframework_structure(
             artifact_root, policy, static_archives, mach_o_images, violations
         )
-    else:
+    elif policy["artifact_kind"] == "xcarchive":
         allowed_direct_mach_o_paths = audit_xcarchive_structure(
-            artifact_root, mach_o_images, violations
+            artifact_root, policy, mach_o_images, violations
+        )
+    else:
+        allowed_direct_mach_o_paths = audit_app_bundle_structure(
+            artifact_root, policy, mach_o_images, violations
         )
     audit_mach_o_policy(mach_o_images, policy, allowed_direct_mach_o_paths, violations)
-    signing = artifact_signing(artifact_root)
-    if policy["require_signature"] and not signing["signed"]:
-        add_violation(
-            violations,
-            "missing_required_signature",
-            artifact_root.name,
-            "distribution policy requires a signature",
-        )
+    embedded_metal_libraries = audit_embedded_metal_libraries(
+        mach_o_images, policy, violations
+    )
+    signing = artifact_signing(artifact_root, policy["artifact_kind"])
+    audit_signing_policy(signing, policy, violations)
+    toolchain = toolchain_tuple(policy_path)
+    audit_toolchain_policy(toolchain, policy, violations)
     sorted_violations = sorted(
         violations,
         key=lambda violation: (violation.code, violation.subject, violation.detail),
@@ -1147,13 +1459,14 @@ def main() -> int:
             "signing": signing,
         },
         "files": files,
+        "embedded_metal_libraries": embedded_metal_libraries,
         "mach_o_images": mach_o_images,
         "policy": policy,
         "provenance": provenance,
         "result": "pass" if not sorted_violations else "fail",
         "schema_version": 1,
         "static_archives": static_archives,
-        "toolchain": toolchain_tuple(policy_path),
+        "toolchain": toolchain,
         "violations": [violation.as_json() for violation in sorted_violations],
     }
     write_report(output_path, report)

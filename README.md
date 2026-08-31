@@ -134,6 +134,12 @@ pixi run test-asyncrt-tsan
 pixi run build-source-core
 pixi run verify-core
 pixi run test-distribution-audit
+MOJO_IOS_DEVELOPMENT_TEAM=YOUR_TEAM_ID pixi run build-reference-archive
+MOJO_IOS_REFERENCE_SKIP_BUILD=1 pixi run test-reference-archive
+MOJO_IOS_DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+MOJO_IOS_CORE_DEVICE_ID=YOUR_CORE_DEVICE_ID \
+  pixi run test-reference-device
+pixi run export-reference-app-store
 pixi run build-swift-smoke
 pixi run test-swift-simulators
 ```
@@ -143,6 +149,12 @@ emits deterministic evidence under `build/distribution-evidence/`, and proves
 the local policy rejects corrupted content, symbols, target metadata, slices,
 and dependencies. It is an XCFramework gate, not a signed-app-archive or App
 Store validation claim.
+
+The reference-archive tasks build a stable Xcode CPU/Metal `.xcarchive`, audit
+the complete signed application and embedded Metal libraries, exercise named
+archive corruptions, and create an audited Apple Distribution-signed IPA.
+`validate-reference-archive` is a separate server-backed Apple validation
+upload and must not be described as passed until its result bundle succeeds.
 
 The Core AI gate uses Xcode 27 side by side and leaves global `xcode-select`
 unchanged:

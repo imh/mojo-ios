@@ -15,6 +15,11 @@ void mojo_ios_parallel_fill_squares(int64_t *output, int64_t count);
 int64_t mojo_ios_async_await_sum(int64_t left, int64_t right);
 int64_t mojo_ios_async_parallel_sum(int64_t left, int64_t right);
 int32_t mojo_ios_async_error_status(int32_t should_raise);
+int32_t mojo_ios_metal_vector_add(
+    const float *left,
+    const float *right,
+    float *output,
+    int64_t count);
 void mojo_ios_print_diagnostic(void);
 #ifdef __cplusplus
 }

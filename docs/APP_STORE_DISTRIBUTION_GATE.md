@@ -38,12 +38,21 @@ release status implicitly.
 
 ## Current partial evidence
 
-`pixi run test-distribution-audit` rebuilds the current feasibility
-XCFramework, emits a deterministic JSON file and static-archive-member
-inventory under `build/distribution-evidence/`, and runs named corruption
-fixtures. This is reusable machinery for Gates A and B, but it audits the
-XCFramework rather than the complete signed application archive. It therefore
-does not complete either gate or advance the archive validation ladder.
+`pixi run test-distribution-audit` audits the current feasibility XCFramework.
+`pixi run test-reference-archive` applies the same machinery to the complete
+development-signed stable CPU/Metal reference `.xcarchive`, including its app
+executable, signature, entitlements, embedded Metal libraries, and five named
+corruptions. `pixi run export-reference-app-store` additionally produces and
+audits an Apple Distribution-signed IPA with `get-task-allow=false`.
+
+The Xcode 26.6 `validation` method is server-backed and requires
+`destination=upload`. On 2026-08-31, Apple first rejected the reference app's
+uncompiled asset catalog with named missing-icon and `CFBundleIconName`
+diagnostics. After packaging the catalog through the normal Xcode resources
+phase, `pixi run validate-reference-archive` succeeded for App Store Connect
+app `6806924512`. App Store Connect still reported `No Builds` in TestFlight
+and `Prepare for Submission` for the draft version, proving this validation
+did not upload a distributable build or submit the app for review.
 
 ## Gate A: AOT and forbidden-content audit
 
