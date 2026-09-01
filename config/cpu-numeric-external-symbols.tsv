@@ -1,0 +1,8 @@
+fixture	symbol	owner	reason
+StrictMath	_cos	libSystem	std.math cosine scalar path
+StrictMath	_expm1	libSystem	std.math stable exponential helper
+StrictMath	_sin	libSystem	std.math sine Float64 scalar path
+StrictMath	_sinf	libSystem	std.math sine Float32 scalar path
+VectorizedMemory	_dup	libSystem	standard masked-load poison diagnostic stream ownership
+VectorizedMemory	_fclose	libSystem	standard masked-load poison diagnostic stream cleanup
+VectorizedMemory	_fdopen	libSystem	standard masked-load poison diagnostic stream construction

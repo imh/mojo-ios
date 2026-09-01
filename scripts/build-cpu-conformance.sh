@@ -19,23 +19,25 @@ export DEVELOPER_DIR="${developer_directory}"
 manifest_path="${project_root}/tests/cpu-conformance/manifest.tsv"
 test -f "${manifest_path}"
 IFS=$'\t' read -r family_header fixture_header symbol_header provenance_header \
-  expected_header \
+  expected_header oracle_header \
   <"${manifest_path}"
 test "${family_header}" = family
 test "${fixture_header}" = fixture
 test "${symbol_header}" = symbol
 test "${provenance_header}" = upstream_provenance
 test "${expected_header}" = expected
+test "${oracle_header}" = oracle
 
 fixture_names=()
 seen_fixture_names=" "
-while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected; do
+while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected oracle; do
   [[ "${family}" =~ ^[a-z0-9][a-z0-9-]*$ ]]
   [[ "${fixture_name}" =~ ^[a-zA-Z0-9_]+\.mojo$ ]]
   [[ "${symbol}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]
   test -f "${project_root}/tests/cpu-conformance/${fixture_name}"
   test -f "${upstream_root}/${upstream_provenance}"
   [[ "${expected}" =~ ^-?[0-9]+$ ]]
+  [[ "${oracle}" =~ ^[a-z]+(\+[a-z]+)*$ ]]
   fixture_stem="${fixture_name%.mojo}"
   case "${seen_fixture_names}" in
     *" ${fixture_stem} "*)
@@ -60,15 +62,16 @@ mkdir -p "${generated_root}"
 {
   printf '#include "CPUConformance.h"\n\n'
   printf '#include <inttypes.h>\n#include <stddef.h>\n#include <stdio.h>\n\n'
-  while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected; do
+  while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected oracle; do
     printf 'extern int64_t %s(void);\n' "${symbol}"
   done < <(tail -n +2 "${manifest_path}")
   printf '\ntypedef struct {\n'
-  printf '  const char *family;\n  int64_t (*run)(void);\n  int64_t expected;\n'
+  printf '  const char *family;\n  int64_t (*run)(void);\n  int64_t expected;\n  const char *oracle;\n'
   printf '} MojoIOSConformanceCase;\n\n'
   printf 'static const MojoIOSConformanceCase cases[] = {\n'
-  while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected; do
-    printf '  {"%s", %s, INT64_C(%s)},\n' "${family}" "${symbol}" "${expected}"
+  while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected oracle; do
+    printf '  {"%s", %s, INT64_C(%s), "%s"},\n' \
+      "${family}" "${symbol}" "${expected}" "${oracle}"
   done < <(tail -n +2 "${manifest_path}")
   printf '};\n\n'
   printf 'int64_t mojo_ios_conformance_family_count(void) {\n'
@@ -77,7 +80,7 @@ mkdir -p "${generated_root}"
   printf '  for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); ++index) {\n'
   printf '    const int64_t actual = cases[index].run();\n'
   printf '    if (actual != cases[index].expected) {\n'
-  printf '      fprintf(stderr, "CPU conformance failure: %%s expected=%%" PRId64 " actual=%%" PRId64 "\\n", cases[index].family, cases[index].expected, actual);\n'
+  printf '      fprintf(stderr, "CPU conformance failure: %%s oracle=%%s expected=%%" PRId64 " actual=%%" PRId64 "\\n", cases[index].family, cases[index].oracle, cases[index].expected, actual);\n'
   printf '      return (int64_t)index + 1;\n'
   printf '    }\n  }\n  return 0;\n}\n'
 } >"${generated_runner_path}"

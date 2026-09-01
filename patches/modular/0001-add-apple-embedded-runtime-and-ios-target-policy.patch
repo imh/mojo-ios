@@ -3934,6 +3934,172 @@ index 538bce9fcf..1a5b1a30f1 100644
    if (field.getValue() == "arch")
      return StringAttr::get(target.getTarget().getArch(), resultType);
    if (field.getValue() == "simd_bit_width")
+diff --git a/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp b/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
+index 71adc27134..e0376d3499 100644
+--- a/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
++++ b/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
+@@ -1221,7 +1221,7 @@ static SmallVector<Value> expandOperands(ConversionPatternRewriter &rewriter,
+           int64_t llvmIdx = tc.getRemappedFieldIndex(kgenStructTy, i);
+           auto elt =
+               rewriter.createOrFold<LLVM::ExtractValueOp>(loc, value, llvmIdx);
+-          operands.push_back(elt);
++          operands.push_back(squashPointlessCasts(elt));
+         }
+       } else {
+         // Parametric struct - just push the value as-is.
+@@ -1234,6 +1234,58 @@ static SmallVector<Value> expandOperands(ConversionPatternRewriter &rewriter,
+   return operands;
+ }
+ 
++/// Return the original value corresponding to a flattened operand index.
++/// Struct values produced by kgen.struct.create retain their source elements,
++/// which can carry compile-time information that is not recoverable from an
++/// LLVM extractvalue while dialect conversion is still in progress.
++static Value getExpandedSourceOperand(ValueRange args, size_t expandedIndex) {
++  for (Value value : args) {
++    auto structType = dyn_cast<StructType>(value.getType());
++    if (!structType) {
++      if (expandedIndex == 0)
++        return value;
++      --expandedIndex;
++      continue;
++    }
++
++    auto elementTypes = structType.getElementTypes();
++    if (!elementTypes)
++      return {};
++    if (expandedIndex >= elementTypes->size()) {
++      expandedIndex -= elementTypes->size();
++      continue;
++    }
++
++    auto structCreate = value.getDefiningOp<StructCreateOp>();
++    if (!structCreate)
++      return {};
++    assert(structCreate->getNumOperands() == elementTypes->size() &&
++           "kgen.struct.create must have one operand per logical field");
++    return structCreate->getOperand(expandedIndex);
++  }
++  return {};
++}
++
++/// Recover a constant attribute from either the converted value or its
++/// original source. During dialect conversion a packed struct element may
++/// temporarily appear as an extractvalue, even though the source element is a
++/// constant.
++static Attribute getConstantAttribute(Value convertedValue,
++                                      Value originalValue = {}) {
++  convertedValue = squashPointlessCasts(convertedValue);
++  if (auto constant = convertedValue.getDefiningOp<LLVM::ConstantOp>())
++    return constant.getValue();
++
++  if (!originalValue)
++    return {};
++  originalValue = squashPointlessCasts(originalValue);
++  if (auto cast = originalValue.getDefiningOp<CastFromBuiltinOp>())
++    originalValue = squashPointlessCasts(cast.getInput());
++  if (auto constant = originalValue.getDefiningOp<LLVM::ConstantOp>())
++    return constant.getValue();
++  return {};
++}
++
+ struct ConvertPOPInlineAsm : ConvertPOPToLLVMPattern<InlineAsmOp> {
+   using ConvertPOPToLLVMPattern::ConvertPOPToLLVMPattern;
+ 
+@@ -1494,17 +1546,17 @@ struct ConvertPOPCallLLVMIntrinsic
+       Value mask = operands[2];
+       Value passthrough = operands[3];
+ 
+-      // Extract alignment constant from the operand
+-      auto alignConstOp = alignmentOp.getDefiningOp<LLVM::ConstantOp>();
+-      if (!alignConstOp) {
++      // Extract alignment constant from the converted operand or its packed
++      // source field while dialect conversion is still in progress.
++      auto alignValue = getConstantAttribute(
++          alignmentOp, getExpandedSourceOperand(op.getOperands(), 1));
++      if (!alignValue) {
+         return op.emitError(
+             "llvm.masked.load alignment must be a constant, got runtime value");
+       }
+-
+-      auto alignAttr = dyn_cast<IntegerAttr>(alignConstOp.getValue());
+-      if (!alignAttr) {
++      auto alignAttr = dyn_cast<IntegerAttr>(alignValue);
++      if (!alignAttr)
+         return op.emitError("llvm.masked.load alignment must be an integer");
+-      }
+ 
+       // Create MaskedLoadOp with alignment as attribute
+       rewriter.replaceOpWithNewOp<LLVM::MaskedLoadOp>(op, types[0], ptr, mask,
+@@ -1529,17 +1581,15 @@ struct ConvertPOPCallLLVMIntrinsic
+       Value alignmentOp = operands[2];
+       Value mask = operands[3];
+ 
+-      // Extract alignment constant from the operand
+-      auto alignConstOp = alignmentOp.getDefiningOp<LLVM::ConstantOp>();
+-      if (!alignConstOp) {
++      auto alignValue = getConstantAttribute(
++          alignmentOp, getExpandedSourceOperand(op.getOperands(), 2));
++      if (!alignValue) {
+         return op.emitError("llvm.masked.store alignment must be a constant, "
+                             "got runtime value");
+       }
+-
+-      auto alignAttr = dyn_cast<IntegerAttr>(alignConstOp.getValue());
+-      if (!alignAttr) {
++      auto alignAttr = dyn_cast<IntegerAttr>(alignValue);
++      if (!alignAttr)
+         return op.emitError("llvm.masked.store alignment must be an integer");
+-      }
+ 
+       // Create MaskedStoreOp with alignment as attribute
+       rewriter.replaceOpWithNewOp<LLVM::MaskedStoreOp>(op, value, ptr, mask,
+@@ -1564,17 +1614,15 @@ struct ConvertPOPCallLLVMIntrinsic
+       Value mask = operands[2];
+       Value passthrough = operands[3];
+ 
+-      // Extract alignment constant from the operand
+-      auto alignConstOp = alignmentOp.getDefiningOp<LLVM::ConstantOp>();
+-      if (!alignConstOp) {
++      auto alignValue = getConstantAttribute(
++          alignmentOp, getExpandedSourceOperand(op.getOperands(), 1));
++      if (!alignValue) {
+         return op.emitError("llvm.masked.gather alignment must be a constant, "
+                             "got runtime value");
+       }
+-
+-      auto alignAttr = dyn_cast<IntegerAttr>(alignConstOp.getValue());
+-      if (!alignAttr) {
++      auto alignAttr = dyn_cast<IntegerAttr>(alignValue);
++      if (!alignAttr)
+         return op.emitError("llvm.masked.gather alignment must be an integer");
+-      }
+ 
+       // Create arg_attrs with alignment on the first argument (ptrs)
+       auto alignNamedAttr = rewriter.getNamedAttr("align", alignAttr);
+@@ -1612,17 +1660,15 @@ struct ConvertPOPCallLLVMIntrinsic
+       Value alignmentOp = operands[2];
+       Value mask = operands[3];
+ 
+-      // Extract alignment constant from the operand
+-      auto alignConstOp = alignmentOp.getDefiningOp<LLVM::ConstantOp>();
+-      if (!alignConstOp) {
++      auto alignValue = getConstantAttribute(
++          alignmentOp, getExpandedSourceOperand(op.getOperands(), 2));
++      if (!alignValue) {
+         return op.emitError("llvm.masked.scatter alignment must be a constant, "
+                             "got runtime value");
+       }
+-
+-      auto alignAttr = dyn_cast<IntegerAttr>(alignConstOp.getValue());
+-      if (!alignAttr) {
++      auto alignAttr = dyn_cast<IntegerAttr>(alignValue);
++      if (!alignAttr)
+         return op.emitError("llvm.masked.scatter alignment must be an integer");
+-      }
+ 
+       // Create arg_attrs with alignment on the second argument (ptrs)
+       auto emptyAttrs = rewriter.getDictionaryAttr({});
 diff --git a/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp b/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp
 new file mode 100644
 index 0000000000..b8c1b4a422
@@ -4269,6 +4435,82 @@ index 15efcd2723..d26e818d2c 100644
      image = existingImage->getSecond();
    } else {
      builder.setInsertionPoint(opWithUse);
+diff --git a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
+index c95a9bde40..562e4ea3d7 100644
+--- a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
++++ b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
+@@ -15,6 +15,66 @@ kgen.func @masked_load_with_alignment(
+   kgen.return %0 : !kgen.simd<4, f32>
+ }
+ 
++// CHECK-LABEL: @masked_load_with_packed_operands
++kgen.func @masked_load_with_packed_operands(
++    %ptr: !kgen.pointer<scalar<f32>>,
++    %mask: !kgen.simd<4, bool>,
++    %passthrough: !kgen.simd<4, f32>) -> !kgen.simd<4, f32> {
++  // CHECK: llvm.intr.masked.load {{.*}} {alignment = 16 : i32}
++  %align_builtin = llvm.mlir.constant(16 : i32) : i32
++  %align = pop.cast_from_builtin %align_builtin : i32 to !kgen.scalar<si32>
++  %pack = kgen.struct.create(%ptr, %align, %mask, %passthrough) :
++    !kgen.struct<(pointer<scalar<f32>>, scalar<si32>, simd<4, bool>, simd<4, f32>)>
++  %0 = pop.call_llvm_intrinsic "llvm.masked.load", (%pack) :
++    (!kgen.struct<(pointer<scalar<f32>>, scalar<si32>, simd<4, bool>, simd<4, f32>)>) -> !kgen.simd<4, f32>
++  kgen.return %0 : !kgen.simd<4, f32>
++}
++
++// CHECK-LABEL: @masked_store_with_packed_operands
++kgen.func @masked_store_with_packed_operands(
++    %value: !kgen.simd<4, f32>,
++    %ptr: !kgen.pointer<scalar<f32>>,
++    %mask: !kgen.simd<4, bool>) {
++  // CHECK: llvm.intr.masked.store {{.*}} {alignment = 16 : i32}
++  %align_builtin = llvm.mlir.constant(16 : i32) : i32
++  %align = pop.cast_from_builtin %align_builtin : i32 to !kgen.scalar<si32>
++  %pack = kgen.struct.create(%value, %ptr, %align, %mask) :
++    !kgen.struct<(simd<4, f32>, pointer<scalar<f32>>, scalar<si32>, simd<4, bool>)>
++  pop.call_llvm_intrinsic "llvm.masked.store", (%pack) :
++    (!kgen.struct<(simd<4, f32>, pointer<scalar<f32>>, scalar<si32>, simd<4, bool>)>) -> ()
++  kgen.return
++}
++
++// CHECK-LABEL: @masked_gather_with_packed_operands
++kgen.func @masked_gather_with_packed_operands(
++    %ptrs: !kgen.simd<4, index>,
++    %mask: !kgen.simd<4, bool>,
++    %passthrough: !kgen.simd<4, f32>) -> !kgen.simd<4, f32> {
++  // CHECK: llvm.call_intrinsic "llvm.masked.gather"({{.*}}) : (vector<4xi64> {align = 8 : i32}, vector<4xi1>, vector<4xf32>)
++  %align_builtin = llvm.mlir.constant(8 : i32) : i32
++  %align = pop.cast_from_builtin %align_builtin : i32 to !kgen.scalar<si32>
++  %pack = kgen.struct.create(%ptrs, %align, %mask, %passthrough) :
++    !kgen.struct<(simd<4, index>, scalar<si32>, simd<4, bool>, simd<4, f32>)>
++  %0 = pop.call_llvm_intrinsic "llvm.masked.gather", (%pack) :
++    (!kgen.struct<(simd<4, index>, scalar<si32>, simd<4, bool>, simd<4, f32>)>) -> !kgen.simd<4, f32>
++  kgen.return %0 : !kgen.simd<4, f32>
++}
++
++// CHECK-LABEL: @masked_scatter_with_packed_operands
++kgen.func @masked_scatter_with_packed_operands(
++    %value: !kgen.simd<4, f32>,
++    %ptrs: !kgen.simd<4, index>,
++    %mask: !kgen.simd<4, bool>) {
++  // CHECK: llvm.call_intrinsic "llvm.masked.scatter"({{.*}}) : (vector<4xf32>, vector<4xi64> {align = 8 : i32}, vector<4xi1>)
++  %align_builtin = llvm.mlir.constant(8 : i32) : i32
++  %align = pop.cast_from_builtin %align_builtin : i32 to !kgen.scalar<si32>
++  %pack = kgen.struct.create(%value, %ptrs, %align, %mask) :
++    !kgen.struct<(simd<4, f32>, simd<4, index>, scalar<si32>, simd<4, bool>)>
++  pop.call_llvm_intrinsic "llvm.masked.scatter", (%pack) :
++    (!kgen.struct<(simd<4, f32>, simd<4, index>, scalar<si32>, simd<4, bool>)>) -> ()
++  kgen.return
++}
++
+ // CHECK-LABEL: @masked_store_with_alignment
+ kgen.func @masked_store_with_alignment(
+     %value: !kgen.simd<4, f32>,
+@@ -55,4 +115,3 @@ kgen.func @masked_scatter_with_alignment(
+ }
+ 
+ }
+-
 diff --git a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl b/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
 index 1e3797a730..b28bd1c860 100644
 --- a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
@@ -4530,11 +4772,17 @@ diff --git a/max/mojo/max/runtime/tracing.mojo b/max/mojo/max/runtime/tracing.mo
 index 6585ac129a..b44039f100 100644
 --- a/max/mojo/max/runtime/tracing.mojo
 +++ b/max/mojo/max/runtime/tracing.mojo
-@@ -20,2 +20,3 @@ from std.sys import stderr
+@@ -18,6 +18,7 @@ from std.collections.optional import Optional, OptionalReg
+ from std.ffi import external_call
+ from std.sys import stderr
  from std.sys.defines import get_defined_int, is_defined
 +from std.sys.info import CompilationTarget
  
-@@ -675,2 +676,8 @@ struct Trace[
+ import std.logger.logger as logger
+ 
+@@ -673,6 +674,12 @@ struct Trace[
+         comptime if is_profiling_disabled[Self.category, Self.level]():
+             return
  
 +        comptime if CompilationTarget.is_ios():
 +            CompilationTarget.unsupported_target_error[
@@ -4543,7 +4791,11 @@ index 6585ac129a..b44039f100 100644
 +            ]()
 +
          # The tracing builtins below expect the string to live beyond begin/end
-@@ -759,2 +766,7 @@ struct Trace[
+         # calls, so we have to pass an inner pointer into the representation.
+         #
+@@ -757,6 +764,11 @@ struct Trace[
+ 
+         comptime if is_profiling_disabled[Self.category, Self.level]():
              return
 +        comptime if CompilationTarget.is_ios():
 +            CompilationTarget.unsupported_target_error[
@@ -4551,7 +4803,11 @@ index 6585ac129a..b44039f100 100644
 +                note="The embedded Apple runtime does not implement this backend on iOS.",
 +            ]()
          if self.event_id == 0:
-@@ -881,2 +893,7 @@ def get_current_trace_id[level: TraceLevel]() -> Int:
+             return
+         external_call["KGEN_CompilerRT_TimeTraceProfilerEnd", NoneType](
+@@ -879,6 +891,11 @@ def get_current_trace_id[level: TraceLevel]() -> Int:
+     """
+ 
      comptime if _is_mojo_profiling_enabled[level]():
 +        comptime if CompilationTarget.is_ios():
 +            CompilationTarget.unsupported_target_error[
@@ -4559,6 +4815,8 @@ index 6585ac129a..b44039f100 100644
 +                note="The embedded Apple runtime does not implement this backend on iOS.",
 +            ]()
          return external_call[
+             "KGEN_CompilerRT_TimeTraceProfilerGetCurrentId", Int
+         ]()
 diff --git a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo b/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
 index 443bc55bd8..86bf7018ba 100644
 --- a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo

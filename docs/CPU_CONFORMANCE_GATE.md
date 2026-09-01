@@ -5,7 +5,7 @@ that arbitrary portable CPU Mojo is complete.
 
 ## Ordinary-Mojo corpus
 
-The corpus in `tests/cpu-conformance` contains nine independent fixtures. Each
+The corpus in `tests/cpu-conformance` contains fourteen independent fixtures. Each
 uses standard Mojo syntax, standard-library imports, and the normal
 `std.runtime.initialize_runtime()` entry convention. None imports an iOS
 module, tests an iOS target flag, calls a project runtime API, or uses a custom
@@ -22,9 +22,17 @@ closure convention.
 | Global constants | Immutable scalar, SIMD, and fixed-array static storage | `mojo/docs/code/manual/metaprogramming/materialization/global_constant.mojo` |
 | Atomics | Integer operations, ordering, compare-exchange, and fences | `mojo/stdlib/test/atomic/test_atomic.mojo` |
 | Atomic concurrency | Contention and release/acquire publication through standard CPU parallelism | `mojo/stdlib/test/runtime/test_locks.mojo` |
+| SIMD primitives | Standard vector construction, conversion, indexing, shuffling, masks, reductions, and arithmetic across representative dtypes and widths | `mojo/stdlib/test/builtin/test_simd.mojo` |
+| Bit intrinsics | Scalar, SIMD, and compile-time integer bit operations | `mojo/stdlib/test/bit/test_bit.mojo` |
+| Strict math | Standard rounding, roots, FMA, transcendental operations, and IEEE edge classifications across supported floating types | `mojo/stdlib/test/math/test_math.mojo` |
+| Vectorized memory | Standard vectorization, unaligned access, masked access, odd tails, and generated-Mojo ASan coverage | `mojo/stdlib/test/algorithm/test_vectorize.mojo` |
+| Optimization semantics | Strict and explicitly fast floating-point behavior plus optimization-sensitive integer/SIMD operations | `mojo/stdlib/test/builtin/test_simd_fastmath.mojo` |
 
 The final three families and the generic mutable-global/TLS boundary are
 detailed in [CPU_STATE_GATE.md](CPU_STATE_GATE.md).
+The final five numeric families, their oracle policy, generic lowering
+regression, LLVM audit, external-symbol attribution, and generated-Mojo ASan
+evidence are detailed in [CPU_NUMERICS_GATE.md](CPU_NUMERICS_GATE.md).
 
 `tests/cpu-conformance/manifest.tsv` is the machine-readable build inventory,
 expected-result record, and provenance input. It is not a support-status
@@ -50,9 +58,9 @@ semantics.
 On 2026-09-01, using Xcode 27 beta build 27A5252f, all matrix gates passed:
 
 ```text
-CPU_CONFORMANCE_BUILD_PASS families=9 variants=3 optimizations=0,3 independent_link=yes
-CPU_CONFORMANCE_SIMULATOR_PASS families=9 devices=iphone,ipad optimizations=0,3
-CPU_CONFORMANCE_DEVICE_PASS families=9 optimizations=0,3 foreign_threads=yes
+CPU_CONFORMANCE_BUILD_PASS families=14 variants=3 optimizations=0,3 independent_link=yes
+CPU_CONFORMANCE_SIMULATOR_PASS families=14 devices=iphone,ipad optimizations=0,3
+CPU_CONFORMANCE_DEVICE_PASS families=14 optimizations=0,3 foreign_threads=yes
 RUNTIME_ABI_CENSUS_PASS total=68 compilerrt=49 device_context=19 compile_time_rejected=7 implemented=61
 ```
 
@@ -99,12 +107,13 @@ an unknown symbol.
 
 ## Remaining boundary
 
-This batch did not expose a compiler-lowering defect, so it adds no artificial
-iOS compiler patch or generic regression test. M2 remains open for broader
-SIMD/math and optimization-sensitive language families,
-minimum/latest target lanes, runtime lifecycle, multi-library composition,
-ASan, and release-equivalent TSan coverage. Those capabilities must be proved
-through the same normal paths or rejected by name without fallback.
+The numeric batch exposed and generically corrected packed intrinsic operand
+constant recovery in POP-to-LLVM lowering; its non-iOS regression is described
+in [CPU_NUMERICS_GATE.md](CPU_NUMERICS_GATE.md). M2 remains open for the broader
+portable-language inventory, minimum/latest target lanes, runtime lifecycle,
+multi-library composition, broad ASan, and release-equivalent TSan coverage.
+Those capabilities must be proved through the same normal paths or rejected by
+name without fallback.
 
 Run:
 
@@ -115,5 +124,8 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu
 ./scripts/test-runtime-abi-census.sh
 ./scripts/test-cpu-state-boundaries.sh
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-state-tsan.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-numerics-lowering.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-numerics-boundaries.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-numerics-asan.sh
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-source-target-policy.sh
 ```

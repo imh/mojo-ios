@@ -1,10 +1,15 @@
-family	fixture	symbol	upstream_provenance	expected
-ownership	Ownership.mojo	mojo_ios_conformance_ownership	mojo/stdlib/test/traits/test_trivial.mojo	2111
-generics	Generics.mojo	mojo_ios_conformance_generics	mojo/docs/code/reference/cheat-sheets/test_compile_time.mojo	42
-traits	Traits.mojo	mojo_ios_conformance_traits	mojo/docs/code/reference/trait-declarations/tests.mojo	42
-errors	Errors.mojo	mojo_ios_conformance_errors	mojo/stdlib/test/builtin/test_error.mojo	42
-ffi	FFI.mojo	mojo_ios_conformance_ffi	mojo/stdlib/test/ffi/test_external_call.mojo	42
-callbacks	Callbacks.mojo	mojo_ios_conformance_callbacks	mojo/docs/code/reference/lambda-expressions/tests.mojo	42
-global-constants	GlobalConstants.mojo	mojo_ios_conformance_global_constants	mojo/docs/code/manual/metaprogramming/materialization/global_constant.mojo	43
-atomics	Atomics.mojo	mojo_ios_conformance_atomics	mojo/stdlib/test/atomic/test_atomic.mojo	42
-atomic-concurrency	AtomicConcurrency.mojo	mojo_ios_conformance_atomic_concurrency	mojo/stdlib/test/runtime/test_locks.mojo	42
+family	fixture	symbol	upstream_provenance	expected	oracle
+ownership	Ownership.mojo	mojo_ios_conformance_ownership	mojo/stdlib/test/traits/test_trivial.mojo	2111	exact
+generics	Generics.mojo	mojo_ios_conformance_generics	mojo/docs/code/reference/cheat-sheets/test_compile_time.mojo	42	exact
+traits	Traits.mojo	mojo_ios_conformance_traits	mojo/docs/code/reference/trait-declarations/tests.mojo	42	exact
+errors	Errors.mojo	mojo_ios_conformance_errors	mojo/stdlib/test/builtin/test_error.mojo	42	exact
+ffi	FFI.mojo	mojo_ios_conformance_ffi	mojo/stdlib/test/ffi/test_external_call.mojo	42	exact
+callbacks	Callbacks.mojo	mojo_ios_conformance_callbacks	mojo/docs/code/reference/lambda-expressions/tests.mojo	42	exact
+global-constants	GlobalConstants.mojo	mojo_ios_conformance_global_constants	mojo/docs/code/manual/metaprogramming/materialization/global_constant.mojo	43	exact
+atomics	Atomics.mojo	mojo_ios_conformance_atomics	mojo/stdlib/test/atomic/test_atomic.mojo	42	exact+ir
+atomic-concurrency	AtomicConcurrency.mojo	mojo_ios_conformance_atomic_concurrency	mojo/stdlib/test/runtime/test_locks.mojo	42	exact+tsan+ir
+simd-primitives	SIMDPrimitives.mojo	mojo_ios_conformance_simd_primitives	mojo/stdlib/test/builtin/test_simd.mojo	42	exact+ir
+bit-intrinsics	BitIntrinsics.mojo	mojo_ios_conformance_bit_intrinsics	mojo/stdlib/test/bit/test_bit.mojo	42	exact+ir
+strict-math	StrictMath.mojo	mojo_ios_conformance_strict_math	mojo/stdlib/test/math/test_math.mojo	42	tolerance+classification+ir
+vectorized-memory	VectorizedMemory.mojo	mojo_ios_conformance_vectorized_memory	mojo/stdlib/test/algorithm/test_vectorize.mojo	42	exact+asan+ir
+optimization-semantics	OptimizationSemantics.mojo	mojo_ios_conformance_optimization_semantics	mojo/stdlib/test/builtin/test_simd_fastmath.mojo	42	exact+ir

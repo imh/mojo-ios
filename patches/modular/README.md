@@ -6,7 +6,8 @@ The stack contains one upstream-oriented patch:
 
 It adds explicit iOS/Darwin stdlib policy, dependency-light Apple embedded
 CompilerRT/AsyncRT targets, Apple AIR/Metal lowering, generic unified-closure
-offload fixes, and the ordinary MAX Metal DeviceContext ABI.
+offload fixes, generic packed masked-intrinsic operand lowering, and the
+ordinary MAX Metal DeviceContext ABI.
 
 Application Mojo continues to use standard APIs. Verified Darwin ABI sharing
 is named explicitly; unimplemented target-known operations use

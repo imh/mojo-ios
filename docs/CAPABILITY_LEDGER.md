@@ -11,7 +11,7 @@ scanned without opening child trackers.
 - Children are optional detail, not another status. Large branches link to
   another Markdown tracker using the same syntax.
 
-- [ ] **Mojo language and compiler**: The initial ownership, generic, error, FFI, immutable-global, and CPU-atomic families pass the O0/O3 matrix; broad upstream conformance remains incomplete. [tracker](trackers/mojo-language-compiler.md)
+- [ ] **Mojo language and compiler**: Ownership, generic, error, FFI, immutable-state, CPU-atomic, SIMD, bit, math, vectorization, and optimization-sensitive families pass the O0/O3 matrix; broad upstream conformance remains incomplete. [tracker](trackers/mojo-language-compiler.md)
 - [ ] **Standard library and native dependencies**: The audited Darwin slice works; broad target-sensitive coverage remains incomplete. [tracker](trackers/stdlib-native.md)
 - [ ] **Standard MAX**: `max.algorithm.parallelize` works normally; broad public MAX coverage remains incomplete. [tracker](trackers/max-standard.md)
 - [ ] **Embedded runtime**: The complete pinned CompilerRT/DeviceContext C ABI is classified; lifecycle closure remains. [tracker](trackers/embedded-runtime.md)
