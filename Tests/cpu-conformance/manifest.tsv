@@ -1,0 +1,7 @@
+family	fixture	upstream_provenance	expected
+ownership	Ownership.mojo	mojo/stdlib/test/traits/test_trivial.mojo	2111
+generics	Generics.mojo	mojo/docs/code/reference/cheat-sheets/test_compile_time.mojo	42
+traits	Traits.mojo	mojo/docs/code/reference/trait-declarations/tests.mojo	42
+errors	Errors.mojo	mojo/stdlib/test/builtin/test_error.mojo	42
+ffi	FFI.mojo	mojo/stdlib/test/ffi/test_external_call.mojo	42
+callbacks	Callbacks.mojo	mojo/docs/code/reference/lambda-expressions/tests.mojo	42

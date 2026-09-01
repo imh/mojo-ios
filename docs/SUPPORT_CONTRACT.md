@@ -31,6 +31,11 @@ required.
 - Suspension and resumption on executor threads, including calls entered from
   Swift-owned threads.
 - Repeated calls and simultaneous entry from Swift-owned threads.
+- Copy/move/destruction, generics, trait dispatch, raised-error unwinding, C
+  FFI, and C callbacks in the O0/O3 host, ARM64 Simulator, and physical-iPad
+  conformance lanes.
+- All 68 operations in the pinned CompilerRT and DeviceContext C ABI have an
+  implemented or compile-time-rejected disposition.
 - Static device and simulator XCFramework variants.
 
 Each item is limited to the operations instantiated by the positive gates. An
@@ -59,17 +64,17 @@ must not be inferred from a nearby item.
   acceptable substitute.
 - Python interoperability and subprocesses.
 - Arbitrary dynamic-library loading.
+- MAX AsyncRT time tracing. Standard `Trace` syntax that selects this backend
+  fails with a named compile-time iOS diagnostic; other supported CPU async and
+  Metal paths do not substitute for it.
 - A Mojo compiler or JIT in the app, downloaded executable Mojo code, or
   runtime generation of new Mojo executable code. Device specialization of a
   shipped Metal or Core AI artifact by its public Apple framework is permitted
   system behavior and is not Mojo JIT.
 - Unaudited target-sensitive stdlib surfaces.
-- Complete CompilerRT/AsyncRT ABI coverage beyond the operations instantiated
-  by the current probes.
-- Production ownership, error, callback, allocator, and multi-library
-  composition rules beyond the current fixed-width scalar and buffer sample.
-- App Store archive validation, privacy-manifest closure, signed XCFramework
-  provenance, TestFlight acceptance, or App Review acceptance.
+- Production allocator, handle, reentrancy, and multi-library composition rules
+  beyond the currently proved ownership, error, FFI, and callback slice.
+- TestFlight acceptance, App Review acceptance, or release-support status.
 
 Where the target determines support, an unsupported call must fail at compile
 time. Runtime errors are reserved for inherently dynamic choices such as a
@@ -90,14 +95,15 @@ permitted.
 
 The architecture is designed for ahead-of-time distribution: the app is not
 intended to ship a Mojo compiler, JIT, or downloaded executable Mojo input.
-That property has not yet been enforced by a complete signed-archive audit.
+That property is enforced by the current signed-archive audit.
 
 [APP_STORE_DISTRIBUTION_GATE.md](APP_STORE_DISTRIBUTION_GATE.md) defines five
 distinct stages: architecture-compliant, Xcode-validated, TestFlight-accepted,
-App-Review-accepted, and release-supported. The current artifact has not yet
-advanced through that ladder. Core AI remains a separate Xcode 27/iOS 27
-preview lane until Apple supports the required toolchain for production
-submission and the physical-device/package gates pass.
+App-Review-accepted, and release-supported. The current CPU/Metal artifact
+passes local archive auditing, signing, export, privacy aggregation, provenance
+checks, and Apple server validation. It has not been selected for TestFlight or
+App Review. Core AI remains a separate Xcode 27/iOS 27 lane and is not part of
+that distributed artifact.
 
 iOS 15.0 is the current CPU/Metal feasibility deployment target, not yet a
 final product minimum. The experimental public Core AI route requires iOS 27.

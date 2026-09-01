@@ -11,10 +11,10 @@ scanned without opening child trackers.
 - Children are optional detail, not another status. Large branches link to
   another Markdown tracker using the same syntax.
 
-- [ ] **Mojo language and compiler**: Named CPU language slices work; broad upstream conformance remains incomplete. [tracker](trackers/mojo-language-compiler.md)
+- [ ] **Mojo language and compiler**: Ownership, generics, traits, errors, C FFI, and callbacks pass the initial O0/O3 matrix; broad upstream conformance remains incomplete. [tracker](trackers/mojo-language-compiler.md)
 - [ ] **Standard library and native dependencies**: The audited Darwin slice works; broad target-sensitive coverage remains incomplete. [tracker](trackers/stdlib-native.md)
 - [ ] **Standard MAX**: `max.algorithm.parallelize` works normally; broad public MAX coverage remains incomplete. [tracker](trackers/max-standard.md)
-- [ ] **Embedded runtime**: The reached CompilerRT and AsyncRT ABI works; complete ABI and lifecycle closure remain. [tracker](trackers/embedded-runtime.md)
+- [ ] **Embedded runtime**: The complete pinned CompilerRT/DeviceContext C ABI is classified; lifecycle closure remains. [tracker](trackers/embedded-runtime.md)
 - [ ] **Async and concurrency**: Ordinary language async works; public tasks, cancellation, async I/O, and accelerator await remain upstream gaps. [tracker](trackers/async-concurrency.md)
 - [ ] **Swift ABI and AOT artifacts**: The sample C ABI and static XCFramework work; production ownership, composition, signing, and release packaging remain. [tracker](trackers/swift-abi-artifacts.md)
 - [ ] **Metal**: A useful standard-path feasibility slice works on Mac, Simulator, and iPad; general backend coverage remains. [tracker](trackers/metal.md)

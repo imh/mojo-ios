@@ -3133,10 +3133,10 @@ index 0000000000..ad1f90c5a5
 +}
 diff --git a/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c b/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c
 new file mode 100644
-index 0000000000..f41a15126a
+index 0000000000..596483500b
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,230 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -3152,6 +3152,7 @@ index 0000000000..f41a15126a
 +#include <assert.h>
 +#include <pthread.h>
 +#include <stdarg.h>
++#include <stdatomic.h>
 +#include <stdbool.h>
 +#include <stddef.h>
 +#include <stdint.h>
@@ -3271,6 +3272,31 @@ index 0000000000..f41a15126a
 +void KGEN_CompilerRT_TracyZoneEnd(uint64_t context) {
 +  assert(context == 0 && "Tracy is disabled in the embedded runtime");
 +}
++
++static _Atomic(size_t) compilerrt_embedded_next_operation_id;
++
++size_t KGEN_CompilerRT_GetNextOpId(void) {
++  return atomic_fetch_add(&compilerrt_embedded_next_operation_id, 1);
++}
++
++void KGEN_CompilerRT_RangeBegin(const char *name, size_t name_length,
++                                uint32_t color) {
++  assert(name != NULL);
++  (void)name_length;
++  (void)color;
++}
++
++void KGEN_CompilerRT_RangeEnd(void) {}
++
++void KGEN_CompilerRT_RangeStep(void) {}
++
++void KGEN_CompilerRT_RangeEnable(void) {}
++
++void KGEN_CompilerRT_RangeDisable(void) {}
++
++size_t KGEN_CompilerRT_RangeIsEnabled(void) { return 0; }
++
++size_t KGEN_CompilerRT_RangeIsRecording(void) { return 0; }
 +
 +int KGEN_CompilerRT_fprintf(FILE *stream, const char *format, ...) {
 +  va_list arguments;
@@ -4500,6 +4526,39 @@ index cc56890d81..bf86d2192c 100644
      @always_inline
      def enqueue_function[
          FuncType: DevicePassable & def() -> None,
+diff --git a/max/mojo/max/runtime/tracing.mojo b/max/mojo/max/runtime/tracing.mojo
+index 6585ac129a..b44039f100 100644
+--- a/max/mojo/max/runtime/tracing.mojo
++++ b/max/mojo/max/runtime/tracing.mojo
+@@ -20,2 +20,3 @@ from std.sys import stderr
+ from std.sys.defines import get_defined_int, is_defined
++from std.sys.info import CompilationTarget
+ 
+@@ -675,2 +676,8 @@ struct Trace[
+ 
++        comptime if CompilationTarget.is_ios():
++            CompilationTarget.unsupported_target_error[
++                operation="MAX AsyncRT time tracing",
++                note="The embedded Apple runtime does not implement this backend on iOS.",
++            ]()
++
+         # The tracing builtins below expect the string to live beyond begin/end
+@@ -759,2 +766,7 @@ struct Trace[
+             return
++        comptime if CompilationTarget.is_ios():
++            CompilationTarget.unsupported_target_error[
++                operation="MAX AsyncRT time tracing",
++                note="The embedded Apple runtime does not implement this backend on iOS.",
++            ]()
+         if self.event_id == 0:
+@@ -881,2 +893,7 @@ def get_current_trace_id[level: TraceLevel]() -> Int:
+     comptime if _is_mojo_profiling_enabled[level]():
++        comptime if CompilationTarget.is_ios():
++            CompilationTarget.unsupported_target_error[
++                operation="MAX AsyncRT time tracing",
++                note="The embedded Apple runtime does not implement this backend on iOS.",
++            ]()
+         return external_call[
 diff --git a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo b/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
 index 443bc55bd8..86bf7018ba 100644
 --- a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo

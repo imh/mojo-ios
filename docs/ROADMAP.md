@@ -37,7 +37,7 @@ ANE interface, or shipped Mojo JIT.
 | --- | --- | --- |
 | M0: truthful tracking foundation | **complete** | One recursively validated Markdown task-list hierarchy with no lost current evidence |
 | M1: stable distribution gate | **complete** | Stable CPU/Metal App Store validation plus accepted Xcode 27 preview provenance, privacy, signing, and reproducibility evidence |
-| M2: CPU compiler and runtime closure | **pending** | Portable CPU language/runtime corpus is proved or explicitly rejected across the base matrix |
+| M2: CPU compiler and runtime closure | **in progress** | Portable CPU language/runtime corpus is proved or explicitly rejected across the base matrix |
 | M3: standard library and production ABI | **pending** | Complete target-sensitive inventory and production ownership/error/callback contract |
 | M4: general Metal backend | **pending** | Declared Metal operation set passes A-series iPhone and M-series iPad release gates |
 | M5: upstream-shaped Core AI backend | **upstream blocked; Apple probe passes** | A standard MAX graph-backend extension is available, then the declared subset converts and executes through public iOS/iPadOS 27 APIs |

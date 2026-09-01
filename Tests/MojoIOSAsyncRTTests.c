@@ -218,6 +218,7 @@ int main(void) {
   assert(api.data != NULL);
   assert(api.length == 3);
   assert(memcmp(api.data, "cpu", 3) == 0);
+  assert(AsyncRT_DeviceContext_id(context) == 0);
 
   int32_t parallelism_level = 0;
   error_message = AsyncRT_DeviceContext_getAttribute(

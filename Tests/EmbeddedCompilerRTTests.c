@@ -35,6 +35,8 @@ void *KGEN_CompilerRT_GetOrCreateGlobal(
     CompilerRTStringRef name,
     CompilerRTGlobalInitializeFunction initialize_function,
     CompilerRTGlobalDestroyFunction destroy_function);
+void *KGEN_CompilerRT_GetGlobalOrNull(CompilerRTStringRef name);
+void KGEN_CompilerRT_InsertGlobal(CompilerRTStringRef name, void *value);
 void *KGEN_CompilerRT_GetOrCreateGlobalIndexed(
     size_t index, CompilerRTGlobalInitializeFunction initialize_function,
     CompilerRTGlobalDestroyFunction destroy_function);
@@ -43,6 +45,23 @@ CompilerRTAsyncRTRuntimeRef KGEN_CompilerRT_AsyncRT_GetCurrentCPUDevice(void);
 CompilerRTAsyncRTRuntimeRef KGEN_CompilerRT_AsyncRT_GetOrCreateCPUDevice(void);
 void KGEN_CompilerRT_AsyncRT_ReleaseCPUDevice(
     CompilerRTAsyncRTRuntimeRef runtime);
+size_t KGEN_CompilerRT_GetNextOpId(void);
+void KGEN_CompilerRT_RangeBegin(const char *name, size_t name_length,
+                                uint32_t color);
+void KGEN_CompilerRT_RangeEnd(void);
+void KGEN_CompilerRT_RangeStep(void);
+void KGEN_CompilerRT_RangeEnable(void);
+void KGEN_CompilerRT_RangeDisable(void);
+size_t KGEN_CompilerRT_RangeIsEnabled(void);
+size_t KGEN_CompilerRT_RangeIsRecording(void);
+void KGEN_CompilerRT_SetAsanAllocators(void);
+int KGEN_CompilerRT_GetStackTrace(char **strings, unsigned depth);
+void KGEN_CompilerRT_PrintStackTraceOnFault(void);
+size_t KGEN_CompilerRT_TracyIsEnabled(void);
+uint64_t KGEN_CompilerRT_TracyZoneBegin(const char *name, size_t name_length,
+                                        uint32_t color);
+void KGEN_CompilerRT_TracyZoneEnd(uint64_t context);
+int KGEN_CompilerRT_fprintf(FILE *stream, const char *format, ...);
 
 static uint32_t destroyed_value_count;
 
@@ -83,6 +102,34 @@ int main(void) {
   KGEN_CompilerRT_AsyncRT_ReleaseCPUDevice(first_runtime);
   assert(KGEN_CompilerRT_AsyncRT_GetCurrentCPUDevice().pointer == NULL);
 
+  size_t first_operation_id = KGEN_CompilerRT_GetNextOpId();
+  size_t second_operation_id = KGEN_CompilerRT_GetNextOpId();
+  assert(second_operation_id == first_operation_id + 1);
+  assert(KGEN_CompilerRT_RangeIsEnabled() == 0);
+  assert(KGEN_CompilerRT_RangeIsRecording() == 0);
+  KGEN_CompilerRT_RangeEnable();
+  assert(KGEN_CompilerRT_RangeIsEnabled() == 0);
+  KGEN_CompilerRT_RangeBegin("", 0, 0);
+  KGEN_CompilerRT_RangeEnd();
+  KGEN_CompilerRT_RangeStep();
+  KGEN_CompilerRT_RangeDisable();
+  KGEN_CompilerRT_SetAsanAllocators();
+
+  char *stack_trace = (char *)(uintptr_t)1;
+  assert(KGEN_CompilerRT_GetStackTrace(&stack_trace, 16) == 0);
+  assert(stack_trace == NULL);
+  KGEN_CompilerRT_PrintStackTraceOnFault();
+  assert(KGEN_CompilerRT_TracyIsEnabled() == 0);
+  uint64_t tracy_context = KGEN_CompilerRT_TracyZoneBegin("test", 4, 0);
+  assert(tracy_context == 0);
+  KGEN_CompilerRT_TracyZoneEnd(tracy_context);
+
+  FILE *formatted_output = tmpfile();
+  assert(formatted_output != NULL);
+  assert(KGEN_CompilerRT_fprintf(formatted_output, "%s:%d", "value", 42) ==
+         8);
+  assert(fclose(formatted_output) == 0);
+
   void *allocation = KGEN_CompilerRT_AlignedAlloc(64, 128);
   assert(allocation != NULL);
   assert((uintptr_t)allocation % 64 == 0);
@@ -110,11 +157,18 @@ int main(void) {
          0);
 
   CompilerRTStringRef global_name = {.data = "test-global", .length = 11};
+  assert(KGEN_CompilerRT_GetGlobalOrNull(global_name) == NULL);
   void *named_value = KGEN_CompilerRT_GetOrCreateGlobal(
       global_name, create_test_value, destroy_test_value);
   assert(named_value != NULL);
   assert(KGEN_CompilerRT_GetOrCreateGlobal(global_name, create_test_value,
                                            destroy_test_value) == named_value);
+  assert(KGEN_CompilerRT_GetGlobalOrNull(global_name) == named_value);
+
+  uint32_t inserted_value = 17;
+  CompilerRTStringRef inserted_name = {.data = "inserted-global", .length = 15};
+  KGEN_CompilerRT_InsertGlobal(inserted_name, &inserted_value);
+  assert(KGEN_CompilerRT_GetGlobalOrNull(inserted_name) == &inserted_value);
 
   void *indexed_value = KGEN_CompilerRT_GetOrCreateGlobalIndexed(
       0, create_test_value, destroy_test_value);
@@ -128,6 +182,6 @@ int main(void) {
   assert(destroyed_value_count == 2);
 
   puts("EMBEDDED_COMPILERRT_HOST_PASS cores=available argv=owned "
-       "globals=recreatable aligned_alloc=passed");
+       "globals=recreatable aligned_alloc=passed tracing=disabled-explicit");
   return 0;
 }

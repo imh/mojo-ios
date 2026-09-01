@@ -1,0 +1,3 @@
+pattern	disposition	reason	evidence
+KGEN_CompilerRT_Python_SetPythonPath	compile_time_rejected	Python interoperability is unavailable in an AOT iOS application	probes/UnsupportedPythonProbe.mojo
+KGEN_CompilerRT_TimeTraceProfiler*	compile_time_rejected	MAX AsyncRT time tracing has no embedded Apple runtime and is rejected by the normal target policy	probes/UnsupportedAsyncRTTimeTraceProbe.mojo
