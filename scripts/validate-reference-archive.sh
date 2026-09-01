@@ -4,7 +4,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 archive_path="${project_root}/build/ReferenceApp/MojoIOSReferenceApp.xcarchive"
 export_path="${project_root}/build/ReferenceApp/AppStoreValidation"
-result_bundle_path="${project_root}/build/ReferenceApp/AppStoreValidation.xcresult"
+validation_log_path="${project_root}/build/ReferenceApp/AppStoreValidation.log"
 export_options_path="${project_root}/config/distribution/AppStoreValidationExportOptions.plist"
 stable_developer_directory="${MOJO_IOS_STABLE_DEVELOPER_DIR:-$(xcode-select -p)}"
 
@@ -20,14 +20,15 @@ case "${export_path}" in
     exit 2
     ;;
 esac
-case "${result_bundle_path}" in
-  "${project_root}/build/ReferenceApp/AppStoreValidation.xcresult") ;;
+case "${validation_log_path}" in
+  "${project_root}/build/ReferenceApp/AppStoreValidation.log") ;;
   *)
-    echo "refusing unexpected validation result path: ${result_bundle_path}" >&2
+    echo "refusing unexpected validation log path: ${validation_log_path}" >&2
     exit 2
     ;;
 esac
-rm -rf -- "${export_path}" "${result_bundle_path}"
+rm -rf -- "${export_path}"
+rm -f -- "${validation_log_path}"
 
 xcodebuild \
   -exportArchive \
@@ -35,6 +36,10 @@ xcodebuild \
   -exportPath "${export_path}" \
   -exportOptionsPlist "${export_options_path}" \
   -allowProvisioningUpdates \
-  -resultBundlePath "${result_bundle_path}"
+  2>&1 | tee "${validation_log_path}"
 
-echo "APP_STORE_VALIDATION_PASS archive=${archive_path} result=${result_bundle_path}"
+test -f "${validation_log_path}"
+grep -Fq "Validated MojoIOSReferenceApp" "${validation_log_path}"
+grep -Fq "** EXPORT SUCCEEDED **" "${validation_log_path}"
+
+echo "APP_STORE_VALIDATION_PASS archive=${archive_path} result=${validation_log_path}"

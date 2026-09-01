@@ -26,7 +26,8 @@ apple_work_queue_source_path="${upstream_root}/AsyncRT/lib/Runtime/Apple/AppleWo
 async_runtime_source_path="${upstream_root}/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c"
 metal_runtime_source_path="${upstream_root}/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m"
 async_runtime_headers_path="${upstream_root}/AsyncRT/include"
-headers_path="${project_root}/include"
+device_framework_path="${device_root}/MojoIOSCore.framework"
+simulator_framework_path="${simulator_root}/MojoIOSCore.framework"
 
 command -v "${mojo_binary}" >/dev/null
 command -v xcrun >/dev/null
@@ -259,14 +260,19 @@ xcrun ar rcs "${simulator_library_path}" \
   "${simulator_root}/AsyncRTDeviceContextCAPI.o" \
   "${simulator_root}/AsyncRTMetalDeviceContextCAPI.o"
 
+"${project_root}/scripts/package-static-framework.sh" \
+  "${device_library_path}" "${device_framework_path}" "${deployment_target}"
+"${project_root}/scripts/package-static-framework.sh" \
+  "${simulator_library_path}" "${simulator_framework_path}" "${deployment_target}"
+
 if [[ -e "${xcframework_path}" ]]; then
   test "${xcframework_path}" = "${project_root}/build/MojoIOSCore.xcframework"
   rm -rf -- "${xcframework_path}"
 fi
 
 xcodebuild -create-xcframework \
-  -library "${device_library_path}" -headers "${headers_path}" \
-  -library "${simulator_library_path}" -headers "${headers_path}" \
+  -framework "${device_framework_path}" \
+  -framework "${simulator_framework_path}" \
   -output "${xcframework_path}"
 
 echo "created ${xcframework_path}"

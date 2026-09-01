@@ -10,8 +10,8 @@
   "artifact_kind": "xcframework",
   "declared_accelerator_artifacts": [],
   "embedded_metal_library_counts": {
-    "ios-arm64-simulator/libMojoIOSReference.a": 5,
-    "ios-arm64/libMojoIOSReference.a": 5
+    "ios-arm64-simulator/MojoIOSCore.framework/MojoIOSCore": 5,
+    "ios-arm64/MojoIOSCore.framework/MojoIOSCore": 5
   },
   "expected_artifact_name": "MojoIOSReference.xcframework",
   "expected_slices": [
@@ -40,6 +40,26 @@
     "xcode_build_version": "17F113"
   },
   "lane": "stable-reference-xcframework",
+  "privacy_manifest_groups": [
+    [
+      "ios-arm64/MojoIOSCore.framework/PrivacyInfo.xcprivacy",
+      "ios-arm64-simulator/MojoIOSCore.framework/PrivacyInfo.xcprivacy"
+    ]
+  ],
+  "privacy_manifests": {
+    "ios-arm64-simulator/MojoIOSCore.framework/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    },
+    "ios-arm64/MojoIOSCore.framework/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    }
+  },
   "require_signature": false,
   "schema_version": 1
 }

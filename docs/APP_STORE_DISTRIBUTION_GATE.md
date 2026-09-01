@@ -1,6 +1,7 @@
 # App Store distribution gate
 
-Status: **specified, not yet passed**.
+Status: **in progress; current privacy-packaged CPU/Metal archive passes local,
+physical, signed-export, and Apple server-validation gates**.
 
 This gate defines the evidence required before describing a Mojo iOS/iPadOS
 artifact as App Store-ready. It complements compiler and runtime correctness;
@@ -41,9 +42,10 @@ release status implicitly.
 `pixi run test-distribution-audit` audits the current feasibility XCFramework.
 `pixi run test-reference-archive` applies the same machinery to the complete
 development-signed stable CPU/Metal reference `.xcarchive`, including its app
-executable, signature, entitlements, embedded Metal libraries, and five named
-corruptions. `pixi run export-reference-app-store` additionally produces and
-audits an Apple Distribution-signed IPA with `get-task-allow=false`.
+executable, signature, entitlements, embedded Metal libraries, app and SDK
+privacy manifests, and nine named corruptions. `pixi run
+export-reference-app-store` additionally produces and audits an Apple
+Distribution-signed IPA with `get-task-allow=false`.
 
 The Xcode 26.6 `validation` method is server-backed and requires
 `destination=upload`. On 2026-08-31, Apple first rejected the reference app's
@@ -52,7 +54,15 @@ diagnostics. After packaging the catalog through the normal Xcode resources
 phase, `pixi run validate-reference-archive` succeeded for App Store Connect
 app `6806924512`. App Store Connect still reported `No Builds` in TestFlight
 and `Prepare for Submission` for the draft version, proving this validation
-did not upload a distributable build or submit the app for review.
+did not upload a distributable build or submit the app for review. That result
+predates the static-framework privacy packaging and is not evidence for the
+current archive. After correcting the consumer to Xcode's native static
+framework file type, the current local archive, physical-device, Xcode privacy
+report, distribution export, and Apple server revalidation all pass.
+
+The current Required Reason API classification, ownership, packaging, and
+negative evidence are recorded in the [privacy manifest
+gate](PRIVACY_MANIFEST_GATE.md).
 
 ## Gate A: AOT and forbidden-content audit
 

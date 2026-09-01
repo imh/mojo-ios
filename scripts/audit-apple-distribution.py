@@ -44,6 +44,61 @@ UNDECLARED_ACCELERATOR_SUFFIXES = {
     ".aimodelc",
     ".metallib",
 }
+
+PRIVACY_MANIFEST_NAME = "PrivacyInfo.xcprivacy"
+PRIVACY_MANIFEST_KEYS = {
+    "NSPrivacyAccessedAPITypes",
+    "NSPrivacyCollectedDataTypes",
+    "NSPrivacyTracking",
+    "NSPrivacyTrackingDomains",
+}
+PRIVACY_ACCESSED_API_TYPE_KEYS = {
+    "NSPrivacyAccessedAPIType",
+    "NSPrivacyAccessedAPITypeReasons",
+}
+REQUIRED_REASON_API_CATEGORIES = {
+    "NSPrivacyAccessedAPICategoryActiveKeyboards": {
+        "approved_reasons": {"3EC4.1", "54BD.1"},
+        "symbol_patterns": [re.compile(r"activeInputModes", re.IGNORECASE)],
+    },
+    "NSPrivacyAccessedAPICategoryDiskSpace": {
+        "approved_reasons": {"7D9E.1", "85F4.1", "B728.1", "E174.1"},
+        "symbol_patterns": [
+            re.compile(r"^_(?:fstatfs|fstatvfs|statfs|statvfs)$"),
+            re.compile(r"volume(?:Available|Total)Capacity", re.IGNORECASE),
+            re.compile(r"(?:systemFreeSize|systemSize)", re.IGNORECASE),
+        ],
+    },
+    "NSPrivacyAccessedAPICategoryFileTimestamp": {
+        "approved_reasons": {"0A2A.1", "3B52.1", "C617.1", "DDA9.1"},
+        "symbol_patterns": [
+            re.compile(r"^_(?:fstat|fstatat|lstat|stat)$"),
+            re.compile(
+                r"(?:contentModificationDateKey|creationDateKey|"
+                r"fileModificationDate|modificationDate)",
+                re.IGNORECASE,
+            ),
+        ],
+    },
+    "NSPrivacyAccessedAPICategorySystemBootTime": {
+        "approved_reasons": {"35F9.1", "3D61.1", "8FFB.1"},
+        "symbol_patterns": [
+            re.compile(r"^_mach_absolute_time$"),
+            re.compile(r"systemUptime", re.IGNORECASE),
+        ],
+    },
+    "NSPrivacyAccessedAPICategoryUserDefaults": {
+        "approved_reasons": {"1C8F.1", "AC6B.1", "C56D.1", "CA92.1"},
+        "symbol_patterns": [re.compile(r"(?:NS)?UserDefaults", re.IGNORECASE)],
+    },
+}
+AMBIGUOUS_REQUIRED_REASON_API_PATTERNS = [
+    re.compile(r"^_(?:fgetattrlist|getattrlist|getattrlistat)$"),
+]
+REVIEWED_NON_REQUIRED_API_PATTERNS = {
+    "clock_gettime": re.compile(r"^_clock_gettime$"),
+    "sysctlbyname": re.compile(r"^_sysctlbyname$"),
+}
 FORBIDDEN_PATH_COMPONENT_PATTERNS = [
     re.compile(r"^__pycache__$", re.IGNORECASE),
     re.compile(r"^(compiler|module)[-_]?cache$", re.IGNORECASE),
@@ -113,9 +168,12 @@ ALLOWED_POLICY_KEYS = {
     "expected_team_identifier",
     "expected_toolchain",
     "lane",
+    "privacy_manifest_groups",
+    "privacy_manifests",
     "require_signature",
     "required_signing_authority_prefix",
     "schema_version",
+    "xcode_static_framework_placeholders",
 }
 ALLOWED_SLICE_KEYS = {
     "architectures",
@@ -266,6 +324,27 @@ def load_policy(path: Path) -> Dict[str, Any]:
         raise AuditError(
             "embedded_metal_library_counts must map paths to nonnegative integers"
         )
+    xcode_static_framework_placeholders = policy.get(
+        "xcode_static_framework_placeholders", []
+    )
+    if not isinstance(xcode_static_framework_placeholders, list) or not all(
+        isinstance(path, str) and path
+        and not Path(path).is_absolute()
+        and ".." not in Path(path).parts
+        for path in xcode_static_framework_placeholders
+    ):
+        raise AuditError("xcode_static_framework_placeholders must be a relative path list")
+    if len(xcode_static_framework_placeholders) != len(
+        set(xcode_static_framework_placeholders)
+    ):
+        raise AuditError("xcode_static_framework_placeholders must be unique")
+    if (
+        xcode_static_framework_placeholders
+        and policy["artifact_kind"] not in {"app_bundle", "xcarchive"}
+    ):
+        raise AuditError(
+            "xcode_static_framework_placeholders apply only to app artifacts"
+        )
     expected_toolchain = policy.get("expected_toolchain", {})
     allowed_toolchain_keys = {
         "iphoneos_sdk_build",
@@ -316,6 +395,64 @@ def load_policy(path: Path) -> Dict[str, Any]:
         ):
             if not isinstance(policy.get(string_key), str) or not policy[string_key]:
                 raise AuditError(f"xcarchive policy requires {string_key}")
+    privacy_manifests = policy.get("privacy_manifests")
+    if not isinstance(privacy_manifests, dict) or not privacy_manifests:
+        raise AuditError("privacy_manifests must be a nonempty path map")
+    required_privacy_policy_keys = {
+        "accessed_api_types",
+        "collected_data_types",
+        "tracking",
+        "tracking_domains",
+    }
+    for manifest_path, manifest_policy in privacy_manifests.items():
+        if (
+            not isinstance(manifest_path, str)
+            or not manifest_path
+            or Path(manifest_path).name != PRIVACY_MANIFEST_NAME
+            or Path(manifest_path).is_absolute()
+            or ".." in Path(manifest_path).parts
+        ):
+            raise AuditError(f"invalid privacy manifest path: {manifest_path}")
+        if not isinstance(manifest_policy, dict):
+            raise AuditError(f"privacy manifest policy must be an object: {manifest_path}")
+        if set(manifest_policy) != required_privacy_policy_keys:
+            raise AuditError(
+                f"privacy manifest policy has wrong keys: {manifest_path}"
+            )
+        accessed_api_types = manifest_policy["accessed_api_types"]
+        if not isinstance(accessed_api_types, dict) or not all(
+            isinstance(category, str)
+            and isinstance(reasons, list)
+            and reasons
+            and all(isinstance(reason, str) and reason for reason in reasons)
+            and len(reasons) == len(set(reasons))
+            for category, reasons in accessed_api_types.items()
+        ):
+            raise AuditError(
+                f"accessed_api_types must map categories to unique reasons: {manifest_path}"
+            )
+        if not isinstance(manifest_policy["collected_data_types"], list):
+            raise AuditError(f"collected_data_types must be a list: {manifest_path}")
+        if not isinstance(manifest_policy["tracking"], bool):
+            raise AuditError(f"tracking must be a Boolean: {manifest_path}")
+        if not isinstance(manifest_policy["tracking_domains"], list) or not all(
+            isinstance(domain, str) and domain
+            for domain in manifest_policy["tracking_domains"]
+        ):
+            raise AuditError(f"tracking_domains must be a string list: {manifest_path}")
+    privacy_manifest_groups = policy.get("privacy_manifest_groups", [])
+    if not isinstance(privacy_manifest_groups, list):
+        raise AuditError("privacy_manifest_groups must be a list")
+    for group in privacy_manifest_groups:
+        if (
+            not isinstance(group, list)
+            or len(group) < 2
+            or len(group) != len(set(group))
+            or not all(path in privacy_manifests for path in group)
+        ):
+            raise AuditError(
+                "each privacy manifest group must contain two or more declared unique paths"
+            )
     return policy
 
 
@@ -749,6 +886,321 @@ def audit_paths(
             )
 
 
+def canonical_privacy_manifest(
+    manifest_path: Path,
+    relative_path: str,
+    violations: List[Violation],
+) -> Optional[Dict[str, Any]]:
+    try:
+        manifest = plistlib.loads(manifest_path.read_bytes())
+    except (OSError, plistlib.InvalidFileException) as error:
+        add_violation(
+            violations,
+            "invalid_privacy_manifest",
+            relative_path,
+            str(error),
+        )
+        return None
+    if not isinstance(manifest, dict):
+        add_violation(
+            violations,
+            "invalid_privacy_manifest",
+            relative_path,
+            "privacy manifest root must be a dictionary",
+        )
+        return None
+    unexpected_keys = sorted(set(manifest) - PRIVACY_MANIFEST_KEYS)
+    if unexpected_keys:
+        add_violation(
+            violations,
+            "invalid_privacy_manifest_keys",
+            relative_path,
+            f"unexpected keys: {unexpected_keys}",
+        )
+
+    tracking = manifest.get("NSPrivacyTracking")
+    tracking_domains = manifest.get("NSPrivacyTrackingDomains")
+    collected_data_types = manifest.get("NSPrivacyCollectedDataTypes")
+    accessed_api_types = manifest.get("NSPrivacyAccessedAPITypes")
+    if not isinstance(tracking, bool):
+        add_violation(
+            violations,
+            "invalid_privacy_tracking",
+            relative_path,
+            "NSPrivacyTracking must be a Boolean",
+        )
+        return None
+    if not isinstance(tracking_domains, list) or not all(
+        isinstance(domain, str) and domain for domain in tracking_domains
+    ):
+        add_violation(
+            violations,
+            "invalid_privacy_tracking_domains",
+            relative_path,
+            "NSPrivacyTrackingDomains must be an array of nonempty strings",
+        )
+        return None
+    if len(tracking_domains) != len(set(tracking_domains)):
+        add_violation(
+            violations,
+            "duplicate_privacy_tracking_domain",
+            relative_path,
+            "NSPrivacyTrackingDomains contains duplicates",
+        )
+    if not tracking and tracking_domains:
+        add_violation(
+            violations,
+            "privacy_tracking_domains_without_tracking",
+            relative_path,
+            "tracking domains require NSPrivacyTracking=true",
+        )
+    if not isinstance(collected_data_types, list):
+        add_violation(
+            violations,
+            "invalid_privacy_collected_data",
+            relative_path,
+            "NSPrivacyCollectedDataTypes must be an array",
+        )
+        return None
+    if not isinstance(accessed_api_types, list):
+        add_violation(
+            violations,
+            "invalid_privacy_accessed_api_types",
+            relative_path,
+            "NSPrivacyAccessedAPITypes must be an array",
+        )
+        return None
+
+    canonical_accessed_api_types: Dict[str, List[str]] = {}
+    for entry_index, entry in enumerate(accessed_api_types):
+        entry_subject = f"{relative_path}:NSPrivacyAccessedAPITypes[{entry_index}]"
+        if not isinstance(entry, dict) or set(entry) != PRIVACY_ACCESSED_API_TYPE_KEYS:
+            add_violation(
+                violations,
+                "invalid_privacy_accessed_api_entry",
+                entry_subject,
+                "entry must contain exactly API type and reasons",
+            )
+            continue
+        category = entry["NSPrivacyAccessedAPIType"]
+        reasons = entry["NSPrivacyAccessedAPITypeReasons"]
+        if not isinstance(category, str) or category not in REQUIRED_REASON_API_CATEGORIES:
+            add_violation(
+                violations,
+                "unknown_required_reason_api_category",
+                entry_subject,
+                f"unknown category: {category}",
+            )
+            continue
+        if (
+            not isinstance(reasons, list)
+            or not reasons
+            or not all(isinstance(reason, str) and reason for reason in reasons)
+        ):
+            add_violation(
+                violations,
+                "invalid_required_reason_list",
+                entry_subject,
+                "reasons must be a nonempty string array",
+            )
+            continue
+        if category in canonical_accessed_api_types:
+            add_violation(
+                violations,
+                "duplicate_required_reason_api_category",
+                entry_subject,
+                category,
+            )
+            continue
+        unique_reasons = sorted(set(reasons))
+        if len(unique_reasons) != len(reasons):
+            add_violation(
+                violations,
+                "duplicate_required_reason",
+                entry_subject,
+                category,
+            )
+        approved_reasons = REQUIRED_REASON_API_CATEGORIES[category][
+            "approved_reasons"
+        ]
+        for reason in unique_reasons:
+            if reason not in approved_reasons:
+                add_violation(
+                    violations,
+                    "unknown_required_reason",
+                    entry_subject,
+                    f"{category}: {reason}",
+                )
+        canonical_accessed_api_types[category] = unique_reasons
+
+    return {
+        "accessed_api_types": dict(sorted(canonical_accessed_api_types.items())),
+        "collected_data_types": collected_data_types,
+        "tracking": tracking,
+        "tracking_domains": sorted(tracking_domains),
+    }
+
+
+def required_reason_api_observations(
+    mach_o_images: Iterable[Dict[str, Any]],
+    violations: List[Violation],
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+    required_observations: List[Dict[str, str]] = []
+    reviewed_non_required_observations: List[Dict[str, str]] = []
+    for image in mach_o_images:
+        symbols = sorted(
+            set(image["exported_symbols"]) | set(image["undefined_symbols"])
+        )
+        for symbol in symbols:
+            for pattern in AMBIGUOUS_REQUIRED_REASON_API_PATTERNS:
+                if pattern.search(symbol):
+                    add_violation(
+                        violations,
+                        "ambiguous_required_reason_api",
+                        image["subject"],
+                        f"{symbol} can expose file metadata or disk space; add an explicit operation-level classification",
+                    )
+            for category, category_policy in REQUIRED_REASON_API_CATEGORIES.items():
+                if any(
+                    pattern.search(symbol)
+                    for pattern in category_policy["symbol_patterns"]
+                ):
+                    required_observations.append(
+                        {
+                            "category": category,
+                            "subject": image["subject"],
+                            "symbol": symbol,
+                        }
+                    )
+            for api_name, pattern in REVIEWED_NON_REQUIRED_API_PATTERNS.items():
+                if pattern.search(symbol):
+                    reviewed_non_required_observations.append(
+                        {
+                            "api": api_name,
+                            "classification": "not in Apple's current Required Reason API categories",
+                            "subject": image["subject"],
+                            "symbol": symbol,
+                        }
+                    )
+    required_observations.sort(
+        key=lambda observation: (
+            observation["category"],
+            observation["subject"],
+            observation["symbol"],
+        )
+    )
+    reviewed_non_required_observations.sort(
+        key=lambda observation: (
+            observation["api"],
+            observation["subject"],
+            observation["symbol"],
+        )
+    )
+    return required_observations, reviewed_non_required_observations
+
+
+def audit_privacy_manifests(
+    artifact_root: Path,
+    file_records: Iterable[Dict[str, Any]],
+    mach_o_images: Iterable[Dict[str, Any]],
+    policy: Dict[str, Any],
+    violations: List[Violation],
+) -> Dict[str, Any]:
+    expected_manifests = policy["privacy_manifests"]
+    actual_manifest_paths = {
+        record["path"]
+        for record in file_records
+        if record["kind"] == "file"
+        and Path(record["path"]).name == PRIVACY_MANIFEST_NAME
+    }
+    for missing_path in sorted(set(expected_manifests) - actual_manifest_paths):
+        add_violation(
+            violations,
+            "missing_privacy_manifest",
+            missing_path,
+            "declared privacy manifest is missing",
+        )
+    for unexpected_path in sorted(actual_manifest_paths - set(expected_manifests)):
+        add_violation(
+            violations,
+            "unexpected_privacy_manifest",
+            unexpected_path,
+            "privacy manifest is in an undeclared bundle location",
+        )
+
+    canonical_manifests: Dict[str, Dict[str, Any]] = {}
+    for relative_path, expected_manifest in sorted(expected_manifests.items()):
+        manifest_path = artifact_root / relative_path
+        if not manifest_path.is_file():
+            continue
+        canonical_manifest = canonical_privacy_manifest(
+            manifest_path, relative_path, violations
+        )
+        if canonical_manifest is None:
+            continue
+        canonical_manifests[relative_path] = canonical_manifest
+        for key, violation_code in (
+            ("accessed_api_types", "privacy_accessed_api_types_mismatch"),
+            ("collected_data_types", "unexpected_privacy_data_collection"),
+            ("tracking", "unexpected_privacy_tracking"),
+            ("tracking_domains", "privacy_tracking_domains_mismatch"),
+        ):
+            expected_value = expected_manifest[key]
+            if key in {"accessed_api_types", "tracking_domains"}:
+                if key == "accessed_api_types":
+                    expected_value = {
+                        category: sorted(reasons)
+                        for category, reasons in sorted(expected_value.items())
+                    }
+                else:
+                    expected_value = sorted(expected_value)
+            if canonical_manifest[key] != expected_value:
+                add_violation(
+                    violations,
+                    violation_code,
+                    relative_path,
+                    f"expected {expected_value}, got {canonical_manifest[key]}",
+                )
+
+    for group in policy.get("privacy_manifest_groups", []):
+        present = [path for path in group if path in canonical_manifests]
+        if len(present) != len(group):
+            continue
+        baseline_path = group[0]
+        baseline = canonical_manifests[baseline_path]
+        for comparison_path in group[1:]:
+            if canonical_manifests[comparison_path] != baseline:
+                add_violation(
+                    violations,
+                    "privacy_manifest_variant_divergence",
+                    comparison_path,
+                    f"manifest differs from {baseline_path}",
+                )
+
+    required_observations, reviewed_non_required_observations = (
+        required_reason_api_observations(mach_o_images, violations)
+    )
+    declared_categories = {
+        category
+        for manifest in canonical_manifests.values()
+        for category in manifest["accessed_api_types"]
+    }
+    for observation in required_observations:
+        if observation["category"] not in declared_categories:
+            add_violation(
+                violations,
+                "undeclared_required_reason_api",
+                observation["subject"],
+                f"{observation['symbol']} requires {observation['category']}",
+            )
+
+    return {
+        "manifests": dict(sorted(canonical_manifests.items())),
+        "required_reason_api_observations": required_observations,
+        "reviewed_non_required_api_observations": reviewed_non_required_observations,
+    }
+
+
 def dependency_is_allowed(dependency: str, allowed_dependencies: Sequence[str]) -> bool:
     return any(
         dependency == allowed or dependency.startswith(f"{allowed}/")
@@ -1079,8 +1531,49 @@ def audit_application_bundle(
             f"expected one Mach-O executable, found {len(matching_images)}",
         )
         return set()
-    validate_image_target(matching_images[0], expected_executable, violations)
-    return {executable_relative_path}
+    application_image = matching_images[0]
+    validate_image_target(application_image, expected_executable, violations)
+    allowed_direct_mach_o_paths = {executable_relative_path}
+    application_dependencies = set(application_image["dependencies"])
+    for placeholder_path in policy.get(
+        "xcode_static_framework_placeholders", []
+    ):
+        matching_placeholder_images = [
+            image
+            for image in mach_o_images
+            if image["archive_member"] is None
+            and image["container_path"] == placeholder_path
+        ]
+        if len(matching_placeholder_images) != 1:
+            add_violation(
+                violations,
+                "invalid_xcode_static_framework_placeholder_count",
+                placeholder_path,
+                f"expected one Xcode static-framework placeholder, found {len(matching_placeholder_images)}",
+            )
+            continue
+        placeholder_image = matching_placeholder_images[0]
+        allowed_direct_mach_o_paths.add(placeholder_path)
+        validate_image_target(placeholder_image, expected_executable, violations)
+        if placeholder_image["exported_symbols"] or placeholder_image["undefined_symbols"]:
+            add_violation(
+                violations,
+                "nonempty_xcode_static_framework_placeholder",
+                placeholder_path,
+                "Xcode's static-framework placeholder must expose no symbols",
+            )
+        framework_name = Path(placeholder_path).name
+        if any(
+            dependency.endswith(f"/{framework_name}")
+            for dependency in application_dependencies
+        ):
+            add_violation(
+                violations,
+                "loaded_xcode_static_framework_placeholder",
+                executable_relative_path,
+                f"application unexpectedly loads static framework placeholder {framework_name}",
+            )
+    return allowed_direct_mach_o_paths
 
 
 def audit_xcarchive_structure(
@@ -1441,6 +1934,9 @@ def main() -> int:
             artifact_root, policy, mach_o_images, violations
         )
     audit_mach_o_policy(mach_o_images, policy, allowed_direct_mach_o_paths, violations)
+    privacy = audit_privacy_manifests(
+        artifact_root, files, mach_o_images, policy, violations
+    )
     embedded_metal_libraries = audit_embedded_metal_libraries(
         mach_o_images, policy, violations
     )
@@ -1462,6 +1958,7 @@ def main() -> int:
         "embedded_metal_libraries": embedded_metal_libraries,
         "mach_o_images": mach_o_images,
         "policy": policy,
+        "privacy": privacy,
         "provenance": provenance,
         "result": "pass" if not sorted_violations else "fail",
         "schema_version": 1,

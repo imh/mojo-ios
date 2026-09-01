@@ -24,6 +24,9 @@
   "embedded_metal_library_counts": {
     "Products/Applications/MojoIOSReferenceApp.app/MojoIOSReferenceApp": 1
   },
+  "xcode_static_framework_placeholders": [
+    "Products/Applications/MojoIOSReferenceApp.app/Frameworks/MojoIOSCore.framework/MojoIOSCore"
+  ],
   "expected_artifact_name": "MojoIOSReferenceApp.xcarchive",
   "expected_bundle_identifier": "com.ianhorn.mojoios.reference",
   "expected_slices": [
@@ -44,6 +47,21 @@
     "xcode_build_version": "17F113"
   },
   "lane": "stable-reference-archive",
+  "privacy_manifest_groups": [],
+  "privacy_manifests": {
+    "Products/Applications/MojoIOSReferenceApp.app/Frameworks/MojoIOSCore.framework/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    },
+    "Products/Applications/MojoIOSReferenceApp.app/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    }
+  },
   "require_signature": true,
   "required_signing_authority_prefix": "Apple Development:",
   "schema_version": 1

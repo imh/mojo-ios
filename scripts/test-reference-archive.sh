@@ -90,7 +90,11 @@ for fixture_name in \
   missing-metal \
   unsigned \
   resigned \
-  toolchain-mismatch; do
+  toolchain-mismatch \
+  missing-app-privacy \
+  missing-sdk-privacy \
+  unexpected-app-tracking \
+  embedded-static-binary; do
   fixture_root="${negative_root}/${fixture_name}"
   mkdir -p "${fixture_root}"
   ditto "${archive_path}" "${fixture_root}/MojoIOSReferenceApp.xcarchive"
@@ -139,4 +143,34 @@ run_expected_failure \
   toolchain_mismatch \
   xcode_build_version
 
-echo "REFERENCE_ARCHIVE_GATE_PASS positive=1 deterministic=1 negative=5"
+missing_app_privacy="${negative_root}/missing-app-privacy/MojoIOSReferenceApp.xcarchive/Products/Applications/MojoIOSReferenceApp.app/PrivacyInfo.xcprivacy"
+rm -- "${missing_app_privacy}"
+run_expected_failure \
+  missing-app-privacy \
+  missing_privacy_manifest \
+  "Products/Applications/MojoIOSReferenceApp.app/PrivacyInfo.xcprivacy"
+
+missing_sdk_privacy="${negative_root}/missing-sdk-privacy/MojoIOSReferenceApp.xcarchive/Products/Applications/MojoIOSReferenceApp.app/Frameworks/MojoIOSCore.framework/PrivacyInfo.xcprivacy"
+rm -- "${missing_sdk_privacy}"
+run_expected_failure \
+  missing-sdk-privacy \
+  missing_privacy_manifest \
+  "Frameworks/MojoIOSCore.framework/PrivacyInfo.xcprivacy"
+
+tracking_manifest="${negative_root}/unexpected-app-tracking/MojoIOSReferenceApp.xcarchive/Products/Applications/MojoIOSReferenceApp.app/PrivacyInfo.xcprivacy"
+plutil -replace NSPrivacyTracking -bool YES "${tracking_manifest}"
+run_expected_failure \
+  unexpected-app-tracking \
+  unexpected_privacy_tracking \
+  "Products/Applications/MojoIOSReferenceApp.app/PrivacyInfo.xcprivacy"
+
+embedded_static_binary="${negative_root}/embedded-static-binary/MojoIOSReferenceApp.xcarchive/Products/Applications/MojoIOSReferenceApp.app/Frameworks/MojoIOSCore.framework/MojoIOSCore"
+cp \
+  "${negative_root}/embedded-static-binary/MojoIOSReferenceApp.xcarchive/Products/Applications/MojoIOSReferenceApp.app/MojoIOSReferenceApp" \
+  "${embedded_static_binary}"
+run_expected_failure \
+  embedded-static-binary \
+  nonempty_xcode_static_framework_placeholder \
+  "Frameworks/MojoIOSCore.framework/MojoIOSCore"
+
+echo "REFERENCE_ARCHIVE_GATE_PASS positive=1 deterministic=1 negative=9 privacy=yes static_framework=xcode-native"

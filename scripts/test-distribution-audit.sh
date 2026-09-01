@@ -32,6 +32,7 @@ test -x "${audit_script}"
 test -f "${fixture_source_root}/ForbiddenCompilerRuntime.c"
 test -f "${fixture_source_root}/GenericObject.c"
 test -f "${fixture_source_root}/PrivateANE.c"
+test -f "${fixture_source_root}/RequiredReasonAPI.c"
 test -f "${fixture_source_root}/TestRuntimeControl.c"
 test -f "${fixture_source_root}/UnexpectedDependency.c"
 test -f "${fixture_source_root}/forbidden-source.txt"
@@ -102,7 +103,14 @@ for fixture_name in \
   wrong-platform \
   wrong-minimum-os \
   unexpected-slice \
-  unexpected-dependency; do
+  unexpected-dependency \
+  missing-privacy \
+  wrong-privacy-bundle \
+  unknown-privacy-reason \
+  unexpected-tracking \
+  unexpected-data-collection \
+  privacy-variant-divergence \
+  undeclared-required-reason; do
   mkdir -p "${negative_root}/${fixture_name}"
   ditto \
     "${artifact_path}" \
@@ -132,7 +140,7 @@ xcrun --sdk iphoneos clang \
   -c "${fixture_source_root}/TestRuntimeControl.c" \
   -o "${test_runtime_object}"
 xcrun ar rcs \
-  "${negative_root}/test-runtime-control/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a" \
+  "${negative_root}/test-runtime-control/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore" \
   "${test_runtime_object}"
 run_expected_failure \
   test-runtime-control \
@@ -146,7 +154,7 @@ xcrun --sdk iphoneos clang \
   -c "${fixture_source_root}/PrivateANE.c" \
   -o "${private_ane_object}"
 xcrun ar rcs \
-  "${negative_root}/private-ane/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a" \
+  "${negative_root}/private-ane/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore" \
   "${private_ane_object}"
 run_expected_failure \
   private-ane \
@@ -163,7 +171,7 @@ xcrun --sdk iphoneos clang \
   -c "${fixture_source_root}/ForbiddenCompilerRuntime.c" \
   -o "${compiler_runtime_object}"
 xcrun ar rcs \
-  "${negative_root}/compiler-runtime/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a" \
+  "${negative_root}/compiler-runtime/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore" \
   "${compiler_runtime_object}"
 run_expected_failure \
   compiler-runtime \
@@ -180,7 +188,7 @@ xcrun --sdk macosx clang \
   -c "${fixture_source_root}/GenericObject.c" \
   -o "${wrong_platform_object}"
 xcrun ar rcs \
-  "${negative_root}/wrong-platform/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a" \
+  "${negative_root}/wrong-platform/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore" \
   "${wrong_platform_object}"
 run_expected_failure \
   wrong-platform \
@@ -194,7 +202,7 @@ xcrun --sdk iphoneos clang \
   -c "${fixture_source_root}/GenericObject.c" \
   -o "${wrong_minimum_object}"
 xcrun ar rcs \
-  "${negative_root}/wrong-minimum-os/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a" \
+  "${negative_root}/wrong-minimum-os/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore" \
   "${wrong_minimum_object}"
 run_expected_failure \
   wrong-minimum-os \
@@ -208,9 +216,8 @@ unexpected_slice_plist="${negative_root}/unexpected-slice/MojoIOSCore.xcframewor
 /usr/libexec/PlistBuddy \
   -c 'Add :AvailableLibraries:2 dict' \
   -c 'Add :AvailableLibraries:2:LibraryIdentifier string ios-arm64-unexpected' \
-  -c 'Add :AvailableLibraries:2:LibraryPath string libMojoIOSCore.a' \
-  -c 'Add :AvailableLibraries:2:BinaryPath string libMojoIOSCore.a' \
-  -c 'Add :AvailableLibraries:2:HeadersPath string Headers' \
+  -c 'Add :AvailableLibraries:2:LibraryPath string MojoIOSCore.framework' \
+  -c 'Add :AvailableLibraries:2:BinaryPath string MojoIOSCore.framework/MojoIOSCore' \
   -c 'Add :AvailableLibraries:2:SupportedPlatform string ios' \
   -c 'Add :AvailableLibraries:2:SupportedArchitectures array' \
   -c 'Add :AvailableLibraries:2:SupportedArchitectures:0 string arm64' \
@@ -236,4 +243,70 @@ run_expected_failure \
   unexpected_dependency \
   Network.framework
 
-echo "DISTRIBUTION_AUDIT_GATE_PASS positive=1 deterministic=1 negative=9"
+device_privacy_relative="ios-arm64/MojoIOSCore.framework/PrivacyInfo.xcprivacy"
+simulator_privacy_relative="ios-arm64-simulator/MojoIOSCore.framework/PrivacyInfo.xcprivacy"
+
+rm -- \
+  "${negative_root}/missing-privacy/MojoIOSCore.xcframework/${device_privacy_relative}"
+run_expected_failure \
+  missing-privacy \
+  missing_privacy_manifest \
+  "${device_privacy_relative}"
+
+wrong_privacy_root="${negative_root}/wrong-privacy-bundle/MojoIOSCore.xcframework/ios-arm64/WrongBundle"
+mkdir -p "${wrong_privacy_root}"
+mv \
+  "${negative_root}/wrong-privacy-bundle/MojoIOSCore.xcframework/${device_privacy_relative}" \
+  "${wrong_privacy_root}/PrivacyInfo.xcprivacy"
+run_expected_failure \
+  wrong-privacy-bundle \
+  unexpected_privacy_manifest \
+  "WrongBundle/PrivacyInfo.xcprivacy"
+
+unknown_reason_manifest="${negative_root}/unknown-privacy-reason/MojoIOSCore.xcframework/${device_privacy_relative}"
+plutil -insert NSPrivacyAccessedAPITypes.0 -json \
+  '{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryFileTimestamp","NSPrivacyAccessedAPITypeReasons":["NOT-APPROVED"]}' \
+  "${unknown_reason_manifest}"
+run_expected_failure \
+  unknown-privacy-reason \
+  unknown_required_reason \
+  NOT-APPROVED
+
+tracking_manifest="${negative_root}/unexpected-tracking/MojoIOSCore.xcframework/${device_privacy_relative}"
+plutil -replace NSPrivacyTracking -bool YES "${tracking_manifest}"
+run_expected_failure \
+  unexpected-tracking \
+  unexpected_privacy_tracking \
+  "${device_privacy_relative}"
+
+data_manifest="${negative_root}/unexpected-data-collection/MojoIOSCore.xcframework/${device_privacy_relative}"
+plutil -insert NSPrivacyCollectedDataTypes.0 -string InjectedData "${data_manifest}"
+run_expected_failure \
+  unexpected-data-collection \
+  unexpected_privacy_data_collection \
+  InjectedData
+
+divergent_manifest="${negative_root}/privacy-variant-divergence/MojoIOSCore.xcframework/${simulator_privacy_relative}"
+plutil -insert NSPrivacyAccessedAPITypes.0 -json \
+  '{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryFileTimestamp","NSPrivacyAccessedAPITypeReasons":["0A2A.1"]}' \
+  "${divergent_manifest}"
+run_expected_failure \
+  privacy-variant-divergence \
+  privacy_manifest_variant_divergence \
+  "${simulator_privacy_relative}"
+
+required_reason_object="${negative_root}/RequiredReasonAPI.o"
+xcrun --sdk iphoneos clang \
+  -target "arm64-apple-ios${deployment_target}" \
+  -Wall -Wextra -Werror \
+  -c "${fixture_source_root}/RequiredReasonAPI.c" \
+  -o "${required_reason_object}"
+xcrun ar rcs \
+  "${negative_root}/undeclared-required-reason/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore" \
+  "${required_reason_object}"
+run_expected_failure \
+  undeclared-required-reason \
+  undeclared_required_reason_api \
+  NSPrivacyAccessedAPICategoryFileTimestamp
+
+echo "DISTRIBUTION_AUDIT_GATE_PASS positive=1 deterministic=1 negative=16 privacy=yes"

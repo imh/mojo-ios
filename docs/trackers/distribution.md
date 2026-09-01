@@ -11,9 +11,9 @@ Parent: [capability tracker](../CAPABILITY_LEDGER.md)
   - [x] **Current XCFramework slices**: Device and Simulator archives and every member match the declared ARM64 platform and iOS 15 feasibility target.
   - [x] **Negative audit fixtures**: Named corruptions prove rejection of source, test/private/compiler/Python/dynamic-loader symbols, wrong platform/minimum OS, unexpected slices, and dependencies.
   - [x] **Reference executable, signing, and entitlements**: The ARM64 executable, embedded Metal libraries, load graph, symbols, strict signature, expected team, and entitlement allowlist pass for both the archive and distribution export. [gate](../../scripts/export-reference-app-store.sh)
-- [ ] **Privacy manifest**: Package `PrivacyInfo.xcprivacy` and prove Required Reason API closure against the shipped surface.
+- [x] **Privacy manifest**: Current package, inventory, ownership, negative, physical, Xcode-report, signed-export, and Apple server-validation gates pass for the shipped CPU/Metal surface. [tracker](distribution-privacy.md)
 - [ ] **Licenses, SBOM, and provenance**: Emit dependency, notice, toolchain tuple, and deterministic artifact-hash records. [tracker](distribution-provenance.md)
-- [x] **Xcode validation**: The stable CPU/Metal reference app builds, executes on the physical iPad, exports with Apple Distribution signing, and passes Apple server validation without creating a TestFlight build or review submission. [tracker](distribution-validation.md)
+- [x] **Xcode validation**: The privacy-packaged stable CPU/Metal reference app builds, executes on the physical iPad, exports with Apple Distribution signing, and passes server validation for this exact archive. [tracker](distribution-validation.md)
 - [ ] **Stable TestFlight acceptance**: Record App Store Connect acceptance separately from local validation.
 - [ ] **Core AI preview submission**: Toolchain-gated; beta evidence may not be promoted to stable release support.
 - [ ] **Reference App Review**: Retain acceptance evidence without implying approval of every consumer application.

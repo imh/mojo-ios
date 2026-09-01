@@ -13,6 +13,10 @@ an iOS special case look complete by introducing a parallel abstraction.
 
 ## Architecture requirements
 
+- Until `/Applications/Xcode.app` itself reports Xcode 27, use
+  `/Applications/Xcode-beta.app/Contents/Developer` via project-scoped
+  `DEVELOPER_DIR`; do not wait for or guess from the expected September release
+  date, and do not change global `xcode-select`.
 - Never infer Metal is absent from `xcrun metal` or a sandboxed Xcode failure;
   query the selected Xcode with `xcodebuild -showComponent MetalToolchain -json`
   and probe the `toolchainSearchPath` frontend directly.

@@ -18,22 +18,39 @@ endif()
 
 set(mojo_ios_project_root "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(mojo_ios_reference_assets "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets")
+set(mojo_ios_reference_privacy
+    "${CMAKE_CURRENT_SOURCE_DIR}/PrivacyInfo.xcprivacy")
+set(mojo_ios_reference_framework
+    "${mojo_ios_project_root}/build/MojoIOSReference.xcframework/ios-arm64/MojoIOSCore.framework")
 set(mojo_ios_reference_library
-    "${mojo_ios_project_root}/build/MojoIOSReference.xcframework/ios-arm64/libMojoIOSReference.a")
+    "${mojo_ios_reference_framework}/MojoIOSCore")
 if(NOT EXISTS "${mojo_ios_reference_library}")
   message(FATAL_ERROR
           "Missing reference-app library: ${mojo_ios_reference_library}")
 endif()
+
+# Xcode has a distinct file type for resource-bearing static frameworks.  This
+# lets the native embed phase replace the already-linked archive with Xcode's
+# empty signed placeholder instead of treating the input as a dynamic framework.
+set_source_files_properties(
+  "${mojo_ios_reference_framework}"
+  PROPERTIES
+    HEADER_FILE_ONLY TRUE
+    XCODE_EXPLICIT_FILE_TYPE "wrapper.framework.static"
+)
 
 add_executable(
   MojoIOSReferenceApp
   MACOSX_BUNDLE
     ReferenceApp.swift
     "${mojo_ios_reference_assets}"
+    "${mojo_ios_reference_framework}"
+    "${mojo_ios_reference_privacy}"
 )
 
 set_source_files_properties(
   "${mojo_ios_reference_assets}"
+  "${mojo_ios_reference_privacy}"
   PROPERTIES MACOSX_PACKAGE_LOCATION Resources
 )
 
@@ -45,7 +62,7 @@ target_include_directories(
 target_link_libraries(
   MojoIOSReferenceApp
   PRIVATE
-    "${mojo_ios_reference_library}"
+    "${mojo_ios_reference_framework}"
     "-framework Foundation"
     "-framework Metal"
     "-framework UIKit"
@@ -73,6 +90,9 @@ set_target_properties(
     XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos"
     XCODE_ATTRIBUTE_SWIFT_VERSION "6.0"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+    XCODE_EMBED_FRAMEWORKS "${mojo_ios_reference_framework}"
+    XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY "YES"
+    XCODE_EMBED_FRAMEWORKS_REMOVE_HEADERS_ON_COPY "YES"
 )
 
 install(TARGETS MojoIOSReferenceApp BUNDLE DESTINATION .)

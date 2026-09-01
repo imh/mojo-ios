@@ -348,8 +348,8 @@ and fresh sessions cannot silently bypass or fork the tracker hierarchy.
 - Validate the archive through Xcode.
 - Record TestFlight acceptance separately from local validation.
 
-Exit: the base CPU/Metal package reaches `release_validated` without making a
-Core AI claim.
+Exit: the base CPU/Metal package passes its declared privacy and provenance
+gates and Xcode validates that exact archive without making a Core AI claim.
 
 ### M2: CPU compiler and runtime closure
 

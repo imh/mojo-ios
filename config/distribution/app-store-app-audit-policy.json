@@ -25,6 +25,9 @@
   "embedded_metal_library_counts": {
     "MojoIOSReferenceApp": 1
   },
+  "xcode_static_framework_placeholders": [
+    "Frameworks/MojoIOSCore.framework/MojoIOSCore"
+  ],
   "expected_artifact_name": "MojoIOSReferenceApp.app",
   "expected_bundle_identifier": "com.ianhorn.mojoios.reference",
   "expected_slices": [
@@ -45,6 +48,21 @@
     "xcode_build_version": "17F113"
   },
   "lane": "stable-app-store-export",
+  "privacy_manifest_groups": [],
+  "privacy_manifests": {
+    "Frameworks/MojoIOSCore.framework/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    },
+    "PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    }
+  },
   "require_signature": true,
   "required_signing_authority_prefix": "Apple Distribution:",
   "schema_version": 1

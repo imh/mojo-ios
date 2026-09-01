@@ -36,7 +36,7 @@ ANE interface, or shipped Mojo JIT.
 | Milestone | Status | Exit gate |
 | --- | --- | --- |
 | M0: truthful tracking foundation | **complete** | One recursively validated Markdown task-list hierarchy with no lost current evidence |
-| M1: stable distribution gate | **specified** | Stable-toolchain CPU/Metal release archive passes local audits and Xcode validation |
+| M1: stable distribution gate | **in progress** | Stable-toolchain CPU/Metal release archive passes privacy, provenance, local, and Xcode validation gates |
 | M2: CPU compiler and runtime closure | **pending** | Portable CPU language/runtime corpus is proved or explicitly rejected across the base matrix |
 | M3: standard library and production ABI | **pending** | Complete target-sensitive inventory and production ownership/error/callback contract |
 | M4: general Metal backend | **pending** | Declared Metal operation set passes A-series iPhone and M-series iPad release gates |
@@ -73,6 +73,10 @@ or generated status view beside it.
 5. Build and sign a reference CPU/Metal application with the stable accepted
    Xcode/SDK, then pass Xcode App Store validation.
 6. Record TestFlight acceptance as a distinct later evidence stage.
+
+The current package, manifest ownership, negative-audit, physical-device,
+privacy-report, signed-export, and Apple server-validation gates pass. The
+remaining provenance work is open.
 
 Core AI remains outside this stable release gate until its Apple toolchain is
 accepted for production submission and its own device/package gates pass.

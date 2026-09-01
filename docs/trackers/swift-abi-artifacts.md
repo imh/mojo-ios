@@ -3,7 +3,7 @@
 Parent: [capability tracker](../CAPABILITY_LEDGER.md)
 
 - [x] **Mojo AOT artifact**: The proved product ships ahead-of-time CPU objects and accelerator artifacts with no Mojo compiler or JIT.
-- [x] **Static XCFramework**: Separate ARM64 device and Simulator libraries package successfully for the current sample.
+- [x] **Static XCFramework**: Separate ARM64 device and Simulator static-framework variants package successfully with headers, module maps, and SDK privacy resources for the current sample.
 - [x] **Sample Swift/C ABI**: Fixed-width scalar exports and pointer-buffer samples cross an explicit C ABI; Mojo internal ABI and `raises` do not cross it.
 - [x] **Apple specialization policy**: Public Apple frameworks may specialize shipped Metal/Core AI artifacts; project-owned executable generation remains prohibited.
 - [ ] **Production ownership and errors**: Strings, slices, structures, handles, allocators, diagnostics, callbacks, reentrancy, Swift concurrency, and ABI versioning remain incomplete.

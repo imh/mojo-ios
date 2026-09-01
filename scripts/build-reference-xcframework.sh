@@ -7,12 +7,14 @@ reference_root="${build_root}/reference-xcframework"
 device_root="${reference_root}/iphoneos"
 simulator_root="${reference_root}/iphonesimulator"
 xcframework_path="${build_root}/MojoIOSReference.xcframework"
-core_device_library="${build_root}/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a"
-core_simulator_library="${build_root}/MojoIOSCore.xcframework/ios-arm64-simulator/libMojoIOSCore.a"
+core_device_library="${build_root}/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore"
+core_simulator_library="${build_root}/MojoIOSCore.xcframework/ios-arm64-simulator/MojoIOSCore.framework/MojoIOSCore"
 metal_device_object="${build_root}/metal-gate/IOSMetalVectorAddProbe.o"
 metal_simulator_object="${build_root}/metal-gate/IOSMetalVectorAddProbe-simulator.o"
 device_library="${device_root}/libMojoIOSReference.a"
 simulator_library="${simulator_root}/libMojoIOSReference.a"
+device_framework="${device_root}/MojoIOSCore.framework"
+simulator_framework="${simulator_root}/MojoIOSCore.framework"
 
 for required_artifact in \
   "${core_device_library}" \
@@ -38,6 +40,11 @@ for reference_library in "${device_library}" "${simulator_library}"; do
   xcrun nm -gU "${reference_library}" | grep -q ' _mojo_ios_metal_vector_add$'
 done
 
+"${project_root}/scripts/package-static-framework.sh" \
+  "${device_library}" "${device_framework}" "15.0"
+"${project_root}/scripts/package-static-framework.sh" \
+  "${simulator_library}" "${simulator_framework}" "15.0"
+
 case "${xcframework_path}" in
   "${project_root}/build/MojoIOSReference.xcframework") ;;
   *)
@@ -47,10 +54,8 @@ case "${xcframework_path}" in
 esac
 rm -rf -- "${xcframework_path}"
 xcodebuild -create-xcframework \
-  -library "${device_library}" \
-  -headers "${project_root}/include" \
-  -library "${simulator_library}" \
-  -headers "${project_root}/include" \
+  -framework "${device_framework}" \
+  -framework "${simulator_framework}" \
   -output "${xcframework_path}"
 
 variant_count="$(

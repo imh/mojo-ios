@@ -144,11 +144,13 @@ pixi run build-swift-smoke
 pixi run test-swift-simulators
 ```
 
-`test-distribution-audit` rebuilds the current device/Simulator XCFramework,
-emits deterministic evidence under `build/distribution-evidence/`, and proves
-the local policy rejects corrupted content, symbols, target metadata, slices,
-and dependencies. It is an XCFramework gate, not a signed-app-archive or App
-Store validation claim.
+`test-distribution-audit` rebuilds the current device/Simulator static-framework
+XCFramework, emits deterministic evidence under `build/distribution-evidence/`,
+and proves the local policy rejects corrupted content, symbols, target
+metadata, slices, dependencies, privacy-manifest ownership, and Required Reason
+API divergence. It is an XCFramework gate, not a signed-app-archive or App Store
+validation claim. See the [privacy manifest gate](docs/PRIVACY_MANIFEST_GATE.md)
+for its deliberately scoped current-surface claim.
 
 The reference-archive tasks build a stable Xcode CPU/Metal `.xcarchive`, audit
 the complete signed application and embedded Metal libraries, exercise named

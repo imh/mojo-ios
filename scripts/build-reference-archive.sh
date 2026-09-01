@@ -44,6 +44,10 @@ cmake \
   -DMOJO_IOS_DEVELOPMENT_TEAM="${MOJO_IOS_DEVELOPMENT_TEAM}" \
   -DMOJO_IOS_REFERENCE_BUNDLE_IDENTIFIER="${bundle_identifier}"
 
+grep -Fq \
+  'explicitFileType = wrapper.framework.static' \
+  "${build_root}/MojoIOSReferenceApp.xcodeproj/project.pbxproj"
+
 case "${archive_path}" in
   "${project_root}/build/ReferenceApp/MojoIOSReferenceApp.xcarchive") ;;
   *)
