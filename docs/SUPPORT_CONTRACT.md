@@ -19,7 +19,7 @@ required.
 
 ## Supported
 
-- Scalars, SIMD, allocation, collections, globals, argv, printing, random,
+- Scalars, SIMD, allocation, collections, argv, printing, random,
   clocks, environment, files, directory iteration, filesystem metadata,
   password lookup, locks, and CPU counts.
 - Fixed-width C-compatible exports and pointer-based buffers.
@@ -34,6 +34,9 @@ required.
 - Copy/move/destruction, generics, trait dispatch, raised-error unwinding, C
   FFI, and C callbacks in the O0/O3 host, ARM64 Simulator, and physical-iPad
   conformance lanes.
+- Standard immutable scalar, SIMD, and fixed-array `global_constant` storage.
+- Standard Int32/Int64 CPU atomics, explicit memory ordering, fences,
+  compare-exchange, real-worker contention, and release/acquire publication.
 - All 68 operations in the pinned CompilerRT and DeviceContext C ABI have an
   implemented or compile-time-rejected disposition.
 - Static device and simulator XCFramework variants.
@@ -44,6 +47,10 @@ must not be inferred from a nearby item.
 
 ## Explicitly unsupported
 
+- Mutable module-level Mojo globals and public standard-library TLS are absent
+  from the pinned upstream language surface. Mutable globals receive the same
+  generic language diagnostic on host and iOS; this project does not add an
+  iOS state API or C-owned substitute.
 - Stable public task construction, cancellation, async I/O, and GPU-await. The
   upstream task substrate is currently private and these remaining operations
   are absent or unfinished generally; there is no iOS-specific substitute or

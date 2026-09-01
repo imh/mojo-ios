@@ -1,26 +1,14 @@
 import Dispatch
 import UIKit
 
-@_silgen_name("mojo_ios_conformance_ownership")
-private func conformanceOwnership() -> Int64
-@_silgen_name("mojo_ios_conformance_generics")
-private func conformanceGenerics() -> Int64
-@_silgen_name("mojo_ios_conformance_traits")
-private func conformanceTraits() -> Int64
-@_silgen_name("mojo_ios_conformance_errors")
-private func conformanceErrors() -> Int64
-@_silgen_name("mojo_ios_conformance_ffi")
-private func conformanceFFI() -> Int64
-@_silgen_name("mojo_ios_conformance_callbacks")
-private func conformanceCallbacks() -> Int64
+@_silgen_name("mojo_ios_conformance_family_count")
+private func conformanceFamilyCount() -> Int64
+@_silgen_name("mojo_ios_conformance_run_all")
+private func runAllConformance() -> Int64
 
 private func runConformanceCorpus() {
-    precondition(conformanceOwnership() == 2_111)
-    precondition(conformanceGenerics() == 42)
-    precondition(conformanceTraits() == 42)
-    precondition(conformanceErrors() == 42)
-    precondition(conformanceFFI() == 42)
-    precondition(conformanceCallbacks() == 42)
+    precondition(conformanceFamilyCount() > 0)
+    precondition(runAllConformance() == 0)
 }
 
 #if MOJO_IOS_CONFORMANCE_O0
@@ -74,7 +62,9 @@ final class CPUConformanceSceneDelegate: UIResponder, UIWindowSceneDelegate {
         print(
             "CPU_CONFORMANCE_APP_PASS optimization="
                 + String(conformanceOptimization)
-                + " families=6 foreign_threads=yes"
+                + " families="
+                + String(conformanceFamilyCount())
+                + " foreign_threads=yes"
         )
         fflush(stdout)
 

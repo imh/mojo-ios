@@ -6,6 +6,9 @@ build_root="${project_root}/build/cpu-conformance/apps"
 developer_directory="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
 export DEVELOPER_DIR="${developer_directory}"
 command -v jq >/dev/null
+manifest_path="${project_root}/tests/cpu-conformance/manifest.tsv"
+family_count="$(( $(wc -l <"${manifest_path}") - 1 ))"
+test "${family_count}" -gt 0
 
 available_simulators_json="$(xcrun simctl list devices available --json)"
 resolve_simulator_id() {
@@ -42,7 +45,7 @@ run_variant() {
   xcrun simctl bootstatus "${simulator_id}" -b
   xcrun simctl install "${simulator_id}" "${app_path}"
   local console_log="${variant_root}/simulator-console.log"
-  local expected_marker="CPU_CONFORMANCE_APP_PASS optimization=${optimization_level} families=6 foreign_threads=yes"
+  local expected_marker="CPU_CONFORMANCE_APP_PASS optimization=${optimization_level} families=${family_count} foreign_threads=yes"
   : >"${console_log}"
   xcrun simctl launch --console-pty --terminate-running-process \
     "${simulator_id}" "${bundle_identifier}" >"${console_log}" 2>&1 &
@@ -76,4 +79,4 @@ for optimization_level in 0 3; do
   run_variant "${optimization_level}" "${ipad_simulator_id}" ipad
 done
 
-echo "CPU_CONFORMANCE_SIMULATOR_PASS families=6 devices=iphone,ipad optimizations=0,3"
+echo "CPU_CONFORMANCE_SIMULATOR_PASS families=${family_count} devices=iphone,ipad optimizations=0,3"

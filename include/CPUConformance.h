@@ -9,16 +9,13 @@ extern "C" {
 
 typedef int64_t (*MojoIOSConformanceCallback)(int64_t value, int64_t context);
 
-int64_t mojo_ios_conformance_ownership(void);
-int64_t mojo_ios_conformance_generics(void);
-int64_t mojo_ios_conformance_traits(void);
-int64_t mojo_ios_conformance_errors(void);
-int64_t mojo_ios_conformance_ffi(void);
-int64_t mojo_ios_conformance_callbacks(void);
+int64_t mojo_ios_conformance_family_count(void);
+int64_t mojo_ios_conformance_run_all(void);
 
 int64_t mojo_ios_conformance_c_add(int64_t left, int64_t right);
-int64_t mojo_ios_conformance_invoke_callback(
-    MojoIOSConformanceCallback callback, int64_t value, int64_t context);
+int64_t
+mojo_ios_conformance_invoke_callback(MojoIOSConformanceCallback callback,
+                                     int64_t value, int64_t context);
 
 #ifdef __cplusplus
 }

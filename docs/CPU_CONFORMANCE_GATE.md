@@ -5,7 +5,7 @@ that arbitrary portable CPU Mojo is complete.
 
 ## Ordinary-Mojo corpus
 
-The corpus in `tests/cpu-conformance` contains six independent fixtures. Each
+The corpus in `tests/cpu-conformance` contains nine independent fixtures. Each
 uses standard Mojo syntax, standard-library imports, and the normal
 `std.runtime.initialize_runtime()` entry convention. None imports an iOS
 module, tests an iOS target flag, calls a project runtime API, or uses a custom
@@ -19,6 +19,12 @@ closure convention.
 | Errors | Raised-error propagation and destruction of a live value | `mojo/stdlib/test/builtin/test_error.mojo` |
 | FFI | Mojo-to-C call through `std.ffi.external_call` | `mojo/stdlib/test/ffi/test_external_call.mojo` |
 | Callbacks | C-to-Mojo function pointer with an explicit context value | `mojo/docs/code/reference/lambda-expressions/tests.mojo` |
+| Global constants | Immutable scalar, SIMD, and fixed-array static storage | `mojo/docs/code/manual/metaprogramming/materialization/global_constant.mojo` |
+| Atomics | Integer operations, ordering, compare-exchange, and fences | `mojo/stdlib/test/atomic/test_atomic.mojo` |
+| Atomic concurrency | Contention and release/acquire publication through standard CPU parallelism | `mojo/stdlib/test/runtime/test_locks.mojo` |
+
+The final three families and the generic mutable-global/TLS boundary are
+detailed in [CPU_STATE_GATE.md](CPU_STATE_GATE.md).
 
 `tests/cpu-conformance/manifest.tsv` is the machine-readable build inventory,
 expected-result record, and provenance input. It is not a support-status
@@ -44,9 +50,9 @@ semantics.
 On 2026-09-01, using Xcode 27 beta build 27A5252f, all matrix gates passed:
 
 ```text
-CPU_CONFORMANCE_BUILD_PASS families=6 variants=3 optimizations=0,3 independent_link=yes
-CPU_CONFORMANCE_SIMULATOR_PASS families=6 devices=iphone,ipad optimizations=0,3
-CPU_CONFORMANCE_DEVICE_PASS families=6 optimizations=0,3 foreign_threads=yes
+CPU_CONFORMANCE_BUILD_PASS families=9 variants=3 optimizations=0,3 independent_link=yes
+CPU_CONFORMANCE_SIMULATOR_PASS families=9 devices=iphone,ipad optimizations=0,3
+CPU_CONFORMANCE_DEVICE_PASS families=9 optimizations=0,3 foreign_threads=yes
 RUNTIME_ABI_CENSUS_PASS total=68 compilerrt=49 device_context=19 compile_time_rejected=7 implemented=61
 ```
 
@@ -94,8 +100,8 @@ an unknown symbol.
 ## Remaining boundary
 
 This batch did not expose a compiler-lowering defect, so it adds no artificial
-iOS compiler patch or generic regression test. M2 remains open for TLS,
-atomics, broader SIMD/math and optimization-sensitive language families,
+iOS compiler patch or generic regression test. M2 remains open for broader
+SIMD/math and optimization-sensitive language families,
 minimum/latest target lanes, runtime lifecycle, multi-library composition,
 ASan, and release-equivalent TSan coverage. Those capabilities must be proved
 through the same normal paths or rejected by name without fallback.
@@ -107,5 +113,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/build-cp
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-conformance-simulators.sh
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-conformance-device.sh
 ./scripts/test-runtime-abi-census.sh
+./scripts/test-cpu-state-boundaries.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-cpu-state-tsan.sh
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/test-source-target-policy.sh
 ```

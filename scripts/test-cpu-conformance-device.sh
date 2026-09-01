@@ -5,6 +5,9 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_root="${project_root}/build/cpu-conformance/apps/device"
 developer_directory="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
 export DEVELOPER_DIR="${developer_directory}"
+manifest_path="${project_root}/tests/cpu-conformance/manifest.tsv"
+family_count="$(( $(wc -l <"${manifest_path}") - 1 ))"
+test "${family_count}" -gt 0
 
 : "${MOJO_IOS_CORE_DEVICE_ID:?Set the physical CoreDevice identifier}"
 : "${MOJO_IOS_DEVELOPMENT_TEAM:?Set the Apple development team identifier}"
@@ -14,7 +17,7 @@ for optimization_level in 0 3; do
   bundle_identifier="com.ianhorn.mojoios.cpuconformance.o${optimization_level}"
   app_path="${variant_root}/Debug-iphoneos/MojoIOSCPUConformance.app"
   console_log="${variant_root}/device-console.log"
-  expected_marker="CPU_CONFORMANCE_APP_PASS optimization=${optimization_level} families=6 foreign_threads=yes"
+  expected_marker="CPU_CONFORMANCE_APP_PASS optimization=${optimization_level} families=${family_count} foreign_threads=yes"
   cmake \
     -S "${project_root}/CPUConformance" \
     -B "${variant_root}" \
@@ -58,4 +61,4 @@ for optimization_level in 0 3; do
   fi
 done
 
-echo "CPU_CONFORMANCE_DEVICE_PASS families=6 optimizations=0,3 foreign_threads=yes"
+echo "CPU_CONFORMANCE_DEVICE_PASS families=${family_count} optimizations=0,3 foreign_threads=yes"

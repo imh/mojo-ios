@@ -5,29 +5,34 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 upstream_root="${MOJO_IOS_UPSTREAM_ROOT:-${project_root}/.work/modular}"
 compiler_path="${MOJO_IOS_MOJO_BINARY:-${upstream_root}/bazel-bin/KGEN/tools/mojo/mojo}"
 stdlib_path="${MOJO_IOS_STDLIB_PATH:-${upstream_root}/mojo/stdlib}"
+max_mojo_path="${MOJO_IOS_MAX_MOJO_PATH:-${upstream_root}/max/mojo}"
 build_root="${project_root}/build/cpu-conformance"
 compiler_state_root="${project_root}/build/compiler-state/cpu-conformance"
 developer_directory="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
 
 test -x "${compiler_path}"
 test -d "${stdlib_path}/std"
+test -d "${max_mojo_path}/max"
 test -d "${developer_directory}"
 export DEVELOPER_DIR="${developer_directory}"
 
 manifest_path="${project_root}/tests/cpu-conformance/manifest.tsv"
 test -f "${manifest_path}"
-IFS=$'\t' read -r family_header fixture_header provenance_header expected_header \
+IFS=$'\t' read -r family_header fixture_header symbol_header provenance_header \
+  expected_header \
   <"${manifest_path}"
 test "${family_header}" = family
 test "${fixture_header}" = fixture
+test "${symbol_header}" = symbol
 test "${provenance_header}" = upstream_provenance
 test "${expected_header}" = expected
 
 fixture_names=()
 seen_fixture_names=" "
-while IFS=$'\t' read -r family fixture_name upstream_provenance expected; do
-  test -n "${family}"
-  test -n "${fixture_name}"
+while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected; do
+  [[ "${family}" =~ ^[a-z0-9][a-z0-9-]*$ ]]
+  [[ "${fixture_name}" =~ ^[a-zA-Z0-9_]+\.mojo$ ]]
+  [[ "${symbol}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]
   test -f "${project_root}/tests/cpu-conformance/${fixture_name}"
   test -f "${upstream_root}/${upstream_provenance}"
   [[ "${expected}" =~ ^-?[0-9]+$ ]]
@@ -48,6 +53,34 @@ if rg -n \
   echo "CPU conformance fixtures contain an iOS-specific Mojo source path" >&2
   exit 1
 fi
+
+generated_root="${build_root}/generated"
+generated_runner_path="${generated_root}/GeneratedConformanceRunner.c"
+mkdir -p "${generated_root}"
+{
+  printf '#include "CPUConformance.h"\n\n'
+  printf '#include <inttypes.h>\n#include <stddef.h>\n#include <stdio.h>\n\n'
+  while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected; do
+    printf 'extern int64_t %s(void);\n' "${symbol}"
+  done < <(tail -n +2 "${manifest_path}")
+  printf '\ntypedef struct {\n'
+  printf '  const char *family;\n  int64_t (*run)(void);\n  int64_t expected;\n'
+  printf '} MojoIOSConformanceCase;\n\n'
+  printf 'static const MojoIOSConformanceCase cases[] = {\n'
+  while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected; do
+    printf '  {"%s", %s, INT64_C(%s)},\n' "${family}" "${symbol}" "${expected}"
+  done < <(tail -n +2 "${manifest_path}")
+  printf '};\n\n'
+  printf 'int64_t mojo_ios_conformance_family_count(void) {\n'
+  printf '  return (int64_t)(sizeof(cases) / sizeof(cases[0]));\n}\n\n'
+  printf 'int64_t mojo_ios_conformance_run_all(void) {\n'
+  printf '  for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); ++index) {\n'
+  printf '    const int64_t actual = cases[index].run();\n'
+  printf '    if (actual != cases[index].expected) {\n'
+  printf '      fprintf(stderr, "CPU conformance failure: %%s expected=%%" PRId64 " actual=%%" PRId64 "\\n", cases[index].family, cases[index].expected, actual);\n'
+  printf '      return (int64_t)index + 1;\n'
+  printf '    }\n  }\n  return 0;\n}\n'
+} >"${generated_runner_path}"
 runtime_sources=(
   "${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c"
   "${upstream_root}/KGEN/lib/CompilerRT/Embedded/Globals.c"
@@ -89,6 +122,7 @@ build_variant() {
     "${compiler_command[@]}" build \
       "${project_root}/tests/cpu-conformance/${fixture_name}.mojo" \
       -I "${stdlib_path}" \
+      -I "${max_mojo_path}" \
       --target-triple="${target_triple}" \
       --target-cpu=generic \
       --optimization-level="${optimization_level}" \
@@ -97,6 +131,12 @@ build_variant() {
       -o "${fixture_object}"
     fixture_objects+=("${fixture_object}")
   done
+  if nm -u \
+    "${variant_root}/Atomics.o" \
+    "${variant_root}/AtomicConcurrency.o" | grep -Eq '___atomic_'; then
+    echo "CPU atomics unexpectedly require an external atomic helper" >&2
+    exit 1
+  fi
 
   xcrun --sdk "${sdk_name}" clang \
     -target "${target_triple}" \
@@ -105,6 +145,13 @@ build_variant() {
     -I "${project_root}/include" \
     -c "${project_root}/tests/cpu-conformance/ConformanceSupport.c" \
     -o "${variant_root}/ConformanceSupport.o"
+  xcrun --sdk "${sdk_name}" clang \
+    -target "${target_triple}" \
+    -O"${optimization_level}" \
+    -std=c17 -Wall -Wextra -Werror \
+    -I "${project_root}/include" \
+    -c "${generated_runner_path}" \
+    -o "${variant_root}/GeneratedConformanceRunner.o"
 
   local runtime_objects=()
   local runtime_names=(CompilerRT Globals KGENAsyncRT AppleWorkQueue DeviceContext)
@@ -149,6 +196,7 @@ build_variant() {
   xcrun libtool -static -D -o "${library_path}" \
     "${fixture_objects[@]}" \
     "${variant_root}/ConformanceSupport.o" \
+    "${variant_root}/GeneratedConformanceRunner.o" \
     "${runtime_objects[@]}"
 
   if [[ "${sdk_name}" = "macosx" ]]; then
@@ -164,11 +212,47 @@ build_variant() {
   fi
 }
 
+verify_device_llvm() {
+  local optimization_level="$1"
+  local variant_root="${build_root}/iphoneos-o${optimization_level}"
+  for fixture_name in GlobalConstants Atomics AtomicConcurrency; do
+    "${compiler_command[@]}" build \
+      "${project_root}/tests/cpu-conformance/${fixture_name}.mojo" \
+      -I "${stdlib_path}" \
+      -I "${max_mojo_path}" \
+      --target-triple=arm64-apple-ios15.0 \
+      --target-cpu=generic \
+      --optimization-level="${optimization_level}" \
+      --emit llvm \
+      -o "${variant_root}/${fixture_name}.ll"
+  done
+
+  local global_ir="${variant_root}/GlobalConstants.ll"
+  local atomic_ir="${variant_root}/Atomics.ll"
+  local concurrent_ir="${variant_root}/AtomicConcurrency.ll"
+  test "$(grep -Ec '^@global_constant(_[0-9]+)? = internal constant' "${global_ir}")" -ge 1
+  if grep -Fq '@llvm.global_ctors' "${global_ir}"; then
+    echo "global_constant unexpectedly introduced a runtime global constructor" >&2
+    exit 1
+  fi
+  grep -Eq 'load atomic i32, .* monotonic' "${atomic_ir}"
+  grep -Eq 'store atomic i32 7, .* release' "${atomic_ir}"
+  grep -Eq 'load atomic i32, .* acquire' "${atomic_ir}"
+  grep -Eq 'atomicrmw add .* acq_rel' "${atomic_ir}"
+  grep -Eq 'atomicrmw sub .* seq_cst' "${atomic_ir}"
+  grep -Eq 'cmpxchg .* acq_rel acquire' "${atomic_ir}"
+  grep -Eq 'cmpxchg .* seq_cst acquire' "${atomic_ir}"
+  grep -Eq 'fence acq_rel' "${atomic_ir}"
+  grep -Eq 'store atomic i32 1, .* release' "${concurrent_ir}"
+  grep -Eq 'load atomic i32, .* acquire' "${concurrent_ir}"
+}
+
 for optimization_level in 0 3; do
   build_variant macos macosx arm64-apple-macos14.0 "${optimization_level}"
   build_variant iphoneos iphoneos arm64-apple-ios15.0 "${optimization_level}"
   build_variant iphonesimulator iphonesimulator \
     arm64-apple-ios15.0-simulator "${optimization_level}"
+  verify_device_llvm "${optimization_level}"
 done
 
 echo "CPU_CONFORMANCE_BUILD_PASS families=${#fixture_names[@]} variants=3 optimizations=0,3 independent_link=yes"
