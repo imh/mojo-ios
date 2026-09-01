@@ -12,7 +12,7 @@ endif()
 
 set(mojo_ios_project_root "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(mojo_ios_core_library
-    "${mojo_ios_project_root}/build/MojoIOSCore.xcframework/ios-arm64/libMojoIOSCore.a")
+    "${mojo_ios_project_root}/build/MojoIOSCore.xcframework/ios-arm64/MojoIOSCore.framework/MojoIOSCore")
 
 if(NOT EXISTS "${mojo_ios_core_library}")
   message(FATAL_ERROR "Missing device library: ${mojo_ios_core_library}")

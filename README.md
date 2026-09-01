@@ -16,6 +16,12 @@ The ledger is a progressive-disclosure tracker. Every row has only a done/not
 done checkbox, a scoped description, and optional nested items or a linked
 tracker when finer detail is useful.
 
+The Xcode 27 preview release-candidate path is documented in
+[docs/RELEASE_PROVENANCE_GATE.md](docs/RELEASE_PROVENANCE_GATE.md). It emits a
+signed XCFramework ZIP, SPDX 2.3 SBOM, exact Modular notices, provenance, and
+Swift-compatible checksums while retaining the undeclared project-license and
+beta-toolchain blockers explicitly.
+
 The architecture deliberately keeps platform knowledge out of application
 Mojo. Library authors use the normal APIs:
 
@@ -203,4 +209,6 @@ See `docs/SUPPORT_CONTRACT.md` for the contract,
 `docs/CAPABILITY_LEDGER.md` for the canonical gap inventory, and
 `docs/ARBITRARY_AOT_MOJO_PLAN.md` for the canonical end-to-end plan,
 `docs/APP_STORE_DISTRIBUTION_GATE.md` for the release evidence ladder, and
+`docs/RELEASE_PROVENANCE_GATE.md` for SBOM, notices, signing, and
+reproducibility evidence, and
 `docs/ROADMAP.md` for the compact milestone order and Xcode toolchain policy.

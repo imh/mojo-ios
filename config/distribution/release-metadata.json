@@ -1,0 +1,11 @@
+{
+  "project_license": "Apache-2.0 WITH LLVM-exception",
+  "project_license_status": "declared in repository LICENSE",
+  "project_repository": "https://github.com/imh/mojo-ios",
+  "project_supplier": "Person: Ian Horn",
+  "schema_version": 1,
+  "upstream_license": "Apache-2.0 WITH LLVM-exception",
+  "upstream_name": "modular",
+  "upstream_repository": "https://github.com/modular/modular",
+  "version": "0.1.0"
+}

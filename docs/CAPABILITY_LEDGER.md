@@ -20,5 +20,5 @@ scanned without opening child trackers.
 - [ ] **Metal**: A useful standard-path feasibility slice works on Mac, Simulator, and iPad; general backend coverage remains. [tracker](trackers/metal.md)
 - [ ] **Core AI and ANE**: Direct Apple feasibility works; standard MAX graph integration remains upstream-blocked. [tracker](trackers/coreai.md)
 - [ ] **Targets and hardware**: Current M-series iPad and ARM64 Simulator feasibility lanes pass; product minimum/latest and A-series coverage remain. [tracker](trackers/targets.md)
-- [ ] **App Store distribution**: The audited CPU/Metal archive passes privacy, signing, export, and Apple server validation; provenance, TestFlight, and review evidence remain. [tracker](trackers/distribution.md)
+- [ ] **App Store distribution**: The audited CPU/Metal archive passes privacy, provenance, signing, export, and Apple server validation; TestFlight, review, and broader audit closure remain. [tracker](trackers/distribution.md)
 - [ ] **Upstream and tracking sustainability**: The source delta and tracker gates are complete; patch splitting, non-iOS regression coverage, and compatibility automation remain. [tracker](trackers/upstream-evidence.md)

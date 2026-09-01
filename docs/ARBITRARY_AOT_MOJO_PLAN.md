@@ -342,14 +342,18 @@ and fresh sessions cannot silently bypass or fork the tracker hierarchy.
 
 ### M1: stable distribution gate
 
-- Build a signed CPU/Metal reference archive with the stable Xcode toolchain.
+- Build a signed CPU/Metal reference archive through the selected Apple
+  toolchain lane.
 - Add forbidden-content, public-API, privacy, architecture, signing, license,
   and dependency audits.
 - Validate the archive through Xcode.
 - Record TestFlight acceptance separately from local validation.
 
 Exit: the base CPU/Metal package passes its declared privacy and provenance
-gates and Xcode validates that exact archive without making a Core AI claim.
+gates, and the same archive path passes stable-Xcode App Store validation,
+without making a Core AI claim. The project accepts Xcode 27 preview
+reproducibility and provenance as sufficient M1 evidence; every published
+release must still rerun the gates against its exact production tuple.
 
 ### M2: CPU compiler and runtime closure
 
@@ -425,7 +429,7 @@ The broad project objective is complete only when:
 8. the complete source delta remains represented by an upstream-shaped,
    continuously rebased patch series.
 
-The next implementation milestone is **M0**, followed immediately by the stable
-CPU/Metal portion of **M1**. No additional isolated accelerator feature should
-be promoted to supported until those foundations can describe and release-gate
-it accurately.
+The next implementation milestone is **M2**, CPU compiler and runtime closure.
+M0 and M1 are complete. No additional isolated accelerator feature should be
+promoted to supported unless those foundations describe and release-gate it
+accurately.

@@ -9,7 +9,20 @@ mojo_stdlib_path="${MOJO_IOS_STDLIB_PATH:-}"
 mojo_max_path="${MOJO_IOS_MAX_PATH:-}"
 upstream_root="${MOJO_IOS_UPSTREAM_ROOT:-${project_root}/.work/modular}"
 mojo_max_kernels_path="${MOJO_IOS_MAX_KERNELS_PATH:-${upstream_root}/max/kernels/src}"
-build_root="${project_root}/build"
+build_root="${MOJO_IOS_BUILD_ROOT:-${project_root}/build}"
+case "${build_root}" in
+  "${project_root}/build"|"${project_root}/build/"*) ;;
+  *)
+    echo "MOJO_IOS_BUILD_ROOT must be inside ${project_root}/build" >&2
+    exit 2
+    ;;
+esac
+case "/${build_root}/" in
+  *"/../"*|*"/./"*)
+    echo "MOJO_IOS_BUILD_ROOT must not contain dot path components" >&2
+    exit 2
+    ;;
+esac
 compiler_state_root="${build_root}/compiler-state"
 compiler_data_root="${compiler_state_root}/data"
 compiler_cache_root="${compiler_state_root}/cache"
@@ -238,12 +251,12 @@ xcrun --sdk iphonesimulator clang \
   -c "${metal_runtime_source_path}" \
   -o "${simulator_root}/AsyncRTMetalDeviceContextCAPI.o"
 
-test "${device_library_path}" = "${project_root}/build/iphoneos/libMojoIOSCore.a"
+test "${device_library_path}" = "${build_root}/iphoneos/libMojoIOSCore.a"
 test "${simulator_library_path}" = \
-  "${project_root}/build/iphonesimulator/libMojoIOSCore.a"
+  "${build_root}/iphonesimulator/libMojoIOSCore.a"
 rm -f -- "${device_library_path}" "${simulator_library_path}"
 
-xcrun ar rcs "${device_library_path}" \
+xcrun libtool -static -D -o "${device_library_path}" \
   "${device_root}/MojoIOSCore.o" \
   "${device_root}/KGENCompilerRTEmbedded.o" \
   "${device_root}/KGENCompilerRTAsyncRT.o" \
@@ -251,7 +264,7 @@ xcrun ar rcs "${device_library_path}" \
   "${device_root}/AsyncRTAppleWorkQueue.o" \
   "${device_root}/AsyncRTDeviceContextCAPI.o" \
   "${device_root}/AsyncRTMetalDeviceContextCAPI.o"
-xcrun ar rcs "${simulator_library_path}" \
+xcrun libtool -static -D -o "${simulator_library_path}" \
   "${simulator_root}/MojoIOSCore.o" \
   "${simulator_root}/KGENCompilerRTEmbedded.o" \
   "${simulator_root}/KGENCompilerRTAsyncRT.o" \
@@ -266,7 +279,7 @@ xcrun ar rcs "${simulator_library_path}" \
   "${simulator_library_path}" "${simulator_framework_path}" "${deployment_target}"
 
 if [[ -e "${xcframework_path}" ]]; then
-  test "${xcframework_path}" = "${project_root}/build/MojoIOSCore.xcframework"
+  test "${xcframework_path}" = "${build_root}/MojoIOSCore.xcframework"
   rm -rf -- "${xcframework_path}"
 fi
 
@@ -274,5 +287,6 @@ xcodebuild -create-xcframework \
   -framework "${device_framework_path}" \
   -framework "${simulator_framework_path}" \
   -output "${xcframework_path}"
+python3 "${project_root}/scripts/normalize-xcframework.py" "${xcframework_path}"
 
 echo "created ${xcframework_path}"

@@ -64,6 +64,13 @@ The current Required Reason API classification, ownership, packaging, and
 negative evidence are recorded in the [privacy manifest
 gate](PRIVACY_MANIFEST_GATE.md).
 
+The Xcode 27 preview release-candidate SBOM, project and upstream notices,
+signing, checksum, and two-build evidence are recorded in the [release
+provenance gate](RELEASE_PROVENANCE_GATE.md). Together with the stable Xcode 26
+archive and server validation, the project accepts this as complete M1
+evidence. Each published release must still regenerate provenance from its
+exact clean production tuple.
+
 ## Gate A: AOT and forbidden-content audit
 
 The final app archive must contain no:

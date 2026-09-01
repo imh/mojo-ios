@@ -1,0 +1,64 @@
+{
+  "allowed_dependencies": [
+    "/System/Library/Frameworks/Foundation.framework/Foundation",
+    "/System/Library/Frameworks/Metal.framework/Metal",
+    "/System/Library/Frameworks/UIKit.framework/UIKit",
+    "/usr/lib/libSystem.B.dylib",
+    "/usr/lib/libc++.1.dylib",
+    "/usr/lib/libobjc.A.dylib"
+  ],
+  "allowed_entitlements": [],
+  "artifact_kind": "xcframework",
+  "declared_accelerator_artifacts": [],
+  "expected_artifact_name": "MojoIOSCore.xcframework",
+  "expected_slices": [
+    {
+      "architectures": [
+        "arm64"
+      ],
+      "binary_type": "static_archive",
+      "identifier": "ios-arm64",
+      "minimum_os": "15.0",
+      "platform": "IOS"
+    },
+    {
+      "architectures": [
+        "arm64"
+      ],
+      "binary_type": "static_archive",
+      "identifier": "ios-arm64-simulator",
+      "minimum_os": "15.0",
+      "platform": "IOSSIMULATOR"
+    }
+  ],
+  "expected_team_identifier": "24D3YSDU5R",
+  "expected_toolchain": {
+    "iphoneos_sdk_build": "24A5422a",
+    "metal_build_version": "27A5252f",
+    "xcode_build_version": "27A5252f"
+  },
+  "lane": "xcode-27-preview-release-candidate",
+  "privacy_manifest_groups": [
+    [
+      "ios-arm64/MojoIOSCore.framework/PrivacyInfo.xcprivacy",
+      "ios-arm64-simulator/MojoIOSCore.framework/PrivacyInfo.xcprivacy"
+    ]
+  ],
+  "privacy_manifests": {
+    "ios-arm64-simulator/MojoIOSCore.framework/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    },
+    "ios-arm64/MojoIOSCore.framework/PrivacyInfo.xcprivacy": {
+      "accessed_api_types": {},
+      "collected_data_types": [],
+      "tracking": false,
+      "tracking_domains": []
+    }
+  },
+  "require_signature": true,
+  "required_signing_authority_prefix": "Apple Development:",
+  "schema_version": 1
+}

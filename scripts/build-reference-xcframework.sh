@@ -26,11 +26,11 @@ done
 
 mkdir -p "${device_root}" "${simulator_root}"
 rm -f -- "${device_library}" "${simulator_library}"
-xcrun libtool -static \
+xcrun libtool -static -D \
   -o "${device_library}" \
   "${core_device_library}" \
   "${metal_device_object}"
-xcrun libtool -static \
+xcrun libtool -static -D \
   -o "${simulator_library}" \
   "${core_simulator_library}" \
   "${metal_simulator_object}"
@@ -57,6 +57,7 @@ xcodebuild -create-xcframework \
   -framework "${device_framework}" \
   -framework "${simulator_framework}" \
   -output "${xcframework_path}"
+python3 "${project_root}/scripts/normalize-xcframework.py" "${xcframework_path}"
 
 variant_count="$(
   /usr/libexec/PlistBuddy -c 'Print :AvailableLibraries' \

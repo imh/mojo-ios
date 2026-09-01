@@ -395,6 +395,15 @@ def load_policy(path: Path) -> Dict[str, Any]:
         ):
             if not isinstance(policy.get(string_key), str) or not policy[string_key]:
                 raise AuditError(f"xcarchive policy requires {string_key}")
+    elif policy["require_signature"]:
+        for string_key in (
+            "expected_team_identifier",
+            "required_signing_authority_prefix",
+        ):
+            if not isinstance(policy.get(string_key), str) or not policy[string_key]:
+                raise AuditError(
+                    f"signed {policy['artifact_kind']} policy requires {string_key}"
+                )
     privacy_manifests = policy.get("privacy_manifests")
     if not isinstance(privacy_manifests, dict) or not privacy_manifests:
         raise AuditError("privacy_manifests must be a nonempty path map")
@@ -1375,7 +1384,14 @@ def audit_xcframework_structure(
     top_level_directories = {
         child.name for child in artifact_root.iterdir() if child.is_dir()
     }
-    for identifier in sorted(top_level_directories - set(expected_by_identifier)):
+    allowed_auxiliary_directories = (
+        {"_CodeSignature"} if policy["require_signature"] else set()
+    )
+    for identifier in sorted(
+        top_level_directories
+        - set(expected_by_identifier)
+        - allowed_auxiliary_directories
+    ):
         add_violation(
             violations,
             "unexpected_slice_directory",
@@ -1679,10 +1695,7 @@ def audit_signing_policy(
             policy["expected_artifact_name"],
             "distribution policy requires a valid signature",
         )
-    if (
-        policy["artifact_kind"] not in {"app_bundle", "xcarchive"}
-        or not signing["signed"]
-    ):
+    if not policy["require_signature"] or not signing["signed"]:
         return
     actual_team_identifier = signing.get("team_identifier", "not recorded")
     if actual_team_identifier != policy["expected_team_identifier"]:
