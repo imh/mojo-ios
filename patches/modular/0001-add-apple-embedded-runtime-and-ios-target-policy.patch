@@ -2717,10 +2717,10 @@ index 0000000000..ab61976090
 +#endif // KGEN_COMPILER_TARGET_METAL_METALBACKEND_H
 diff --git a/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c b/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c
 new file mode 100644
-index 0000000000..ad1f90c5a5
+index 0000000000..1a9f8da4c3
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,409 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -2856,7 +2856,6 @@ index 0000000000..ad1f90c5a5
 +    CompilerRTAsyncChainRef chain_reference) {
 +  CompilerRTEmbeddedAsyncChain **chain_slot =
 +      compilerrt_embedded_async_chain_slot(chain_reference);
-+  assert(*chain_slot == NULL);
 +
 +  CompilerRTEmbeddedAsyncChain *chain = malloc(sizeof(*chain));
 +  assert(chain != NULL);
@@ -4269,6 +4268,25 @@ index dad2e78a59..4c52a37969 100644
    Value result = callOp.getResult(0);
  
    if (adapteeParts.needsResultConversion) {
+diff --git a/KGEN/lib/POPDialect/POPOpsFolders.cpp b/KGEN/lib/POPDialect/POPOpsFolders.cpp
+index 3da76ca2c1..ba6a31bd9d 100644
+--- a/KGEN/lib/POPDialect/POPOpsFolders.cpp
++++ b/KGEN/lib/POPDialect/POPOpsFolders.cpp
+@@ -1472,6 +1472,14 @@ LogicalResult StoreOp::canonicalize(StoreOp op, PatternRewriter &b) {
+     return failure();
+   }
+ 
++  // A None or empty value carries no bits and therefore cannot change memory.
++  // Erasing the store also avoids requiring a materialized result address for
++  // empty coroutine results.
++  if (StructType::isNoneOrEmpty(op.getArg().getType())) {
++    b.eraseOp(op);
++    return success();
++  }
++
+   // Storing an unknown to a pointer is a nop as it is legal to assume the
+   // memory is already the same value.
+   if (auto cst = dyn_cast_or_null<KGEN::ParamConstantOp>(
 diff --git a/KGEN/lib/Target/Metal/MetalTraits.cpp b/KGEN/lib/Target/Metal/MetalTraits.cpp
 new file mode 100644
 index 0000000000..0a9817a316
@@ -4435,6 +4453,27 @@ index 15efcd2723..d26e818d2c 100644
      image = existingImage->getSecond();
    } else {
      builder.setInsertionPoint(opWithUse);
+diff --git a/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir b/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
+index 223f1008e5..bb5db72192 100644
+--- a/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
++++ b/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
+@@ -2,6 +2,16 @@
+ 
+ // -----
+ 
++// CHECK-LABEL: @none_store_is_noop
++// CHECK-NOT: pop.store
++kgen.func @none_store_is_noop(%arg0: !kgen.pointer<none>) {
++  %none = kgen.param.constant: none = <#kgen.none>
++  pop.store %none, %arg0 : !kgen.pointer<none>
++  kgen.return
++}
++
++// -----
++
+ // CHECK-LABEL: @neg
+ kgen.func @neg() -> (!kgen.simd<2, si8>, !kgen.simd<2, f32>) {
+   // CHECK-DAG: <1, -1>
 diff --git a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
 index c95a9bde40..562e4ea3d7 100644
 --- a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir

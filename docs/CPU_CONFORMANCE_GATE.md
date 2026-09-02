@@ -109,11 +109,13 @@ an unknown symbol.
 
 The numeric batch exposed and generically corrected packed intrinsic operand
 constant recovery in POP-to-LLVM lowering; its non-iOS regression is described
-in [CPU_NUMERICS_GATE.md](CPU_NUMERICS_GATE.md). M2 remains open for the broader
-portable-language inventory, minimum/latest target lanes, runtime lifecycle,
-multi-library composition, broad ASan, and release-equivalent TSan coverage.
-Those capabilities must be proved through the same normal paths or rejected by
-name without fallback.
+in [CPU_NUMERICS_GATE.md](CPU_NUMERICS_GATE.md). Process-resident runtime
+lifecycle, same-tuple multi-library composition, broad generated-Mojo ASan, and
+release-equivalent TSan are now proved in
+[CPU_RUNTIME_LIFECYCLE_GATE.md](CPU_RUNTIME_LIFECYCLE_GATE.md). M2 remains open
+for the broader portable-language inventory and missing target lanes. Those
+capabilities must be proved through the same normal paths or rejected by name
+without fallback.
 
 Run:
 

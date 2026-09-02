@@ -97,8 +97,9 @@ accepted for production submission and its own device/package gates pass.
    host results where appropriate.
 5. Census the complete pinned CompilerRT/AsyncRT ABI and classify every
    operation.
-6. Gate initialization, teardown, global destruction, executor shutdown, app
-   lifecycle, foreign-thread entry, multiple Mojo libraries, ASan, and TSan.
+6. Gate initialization, quiescent global teardown, process-resident executor
+   ownership, app lifecycle, foreign-thread entry, same-tuple multiple Mojo
+   libraries, ASan, and TSan.
 7. Reduce every generic compiler correction to an upstream regression test.
 
 ## M3: standard library and production ABI

@@ -137,7 +137,9 @@ static void asyncrt_test_continuation_resume(int8_t *untyped_task) {
 }
 
 static void asyncrt_test_language_async_abi(void) {
-  void *completion_storage = NULL;
+  // InitializeChain follows the upstream placement-construction contract: its
+  // destination is uninitialized storage, not a pre-zeroed pointer slot.
+  void *completion_storage = (void *)(uintptr_t)UINTPTR_MAX;
   CompilerRTAsyncChainRef completion_chain = {
       .pointer = &completion_storage,
   };

@@ -97,11 +97,13 @@ The current repository proves useful but deliberately narrow slices:
 - a fixed direct Core AI graph feasibility slice with AOT artifacts and public
   Swift device compile/link, explicitly separate from Mojo/MAX integration.
 
-These are scoped proofs, not whole-category claims. In particular, the current
-symbol gate covers the runtime symbols used by the probes rather than the
-complete upstream runtime ABI. Shipped runtime archives now exclude test-only
-AsyncRT controls, while instrumented host and sanitizer products remain
-separate.
+These are scoped proofs, not whole-category claims. The complete pinned
+CompilerRT and DeviceContext C ABI is classified, and same-tuple independently
+compiled Mojo libraries share one process-resident runtime across host,
+Simulator, and physical-iPad lifecycle gates. Cross-version runtime composition
+and the broader production Swift ABI remain open. Shipped runtime archives
+exclude test-only AsyncRT controls, while instrumented host and sanitizer
+products remain separate.
 
 ## Gap workstreams
 
@@ -130,11 +132,12 @@ Inventory the complete CompilerRT and AsyncRT ABI exported by the pinned
 upstream revision. Every operation must be implemented, rejected before code
 generation, or return a named error when its support decision is dynamic.
 
-The runtime work includes initialization, repeated initialization, teardown,
-global destruction, allocation alignment, task and chain lifetime, executor
-shutdown, app suspension/background behavior, foreign-thread entry, sanitizer
-coverage, symbol visibility, dead stripping, and composition of more than one
-Mojo library without duplicate runtime ownership.
+The runtime work includes initialization, repeated initialization, quiescent
+global destruction, allocation alignment, task and chain lifetime,
+process-resident executor ownership, app suspension/background behavior,
+foreign-thread entry, sanitizer coverage, symbol visibility, dead stripping,
+and composition of more than one Mojo library without duplicate runtime
+ownership.
 
 Release runtime objects must be built without testing hooks. Instrumented
 runtime objects remain a separate test-only artifact.
