@@ -5,9 +5,11 @@ static XCFramework with distinct ARM64 device and simulator variants. The
 compiler runs on macOS; no compiler, JIT, or downloaded executable code runs in
 the app.
 
-The current repository proves a useful feasibility surface; it does not yet
-claim arbitrary Mojo coverage or an App Store-validated release artifact. The
-canonical completion plan is
+The current repository proves a useful but deliberately scoped surface; it does
+not yet claim arbitrary Mojo coverage. The current CPU/Metal reference archive
+has passed Apple server validation, while TestFlight acceptance, App Review,
+and release-support status remain separate later evidence stages. The canonical
+completion plan is
 [docs/ARBITRARY_AOT_MOJO_PLAN.md](docs/ARBITRARY_AOT_MOJO_PLAN.md), with current
 scoped status in [docs/CAPABILITY_LEDGER.md](docs/CAPABILITY_LEDGER.md) and the
 distribution evidence ladder in
@@ -18,9 +20,10 @@ tracker when finer detail is useful.
 
 The Xcode 27 preview release-candidate path is documented in
 [docs/RELEASE_PROVENANCE_GATE.md](docs/RELEASE_PROVENANCE_GATE.md). It emits a
-signed XCFramework ZIP, SPDX 2.3 SBOM, exact Modular notices, provenance, and
-Swift-compatible checksums while retaining the undeclared project-license and
-beta-toolchain blockers explicitly.
+signed XCFramework ZIP, SPDX 2.3 SBOM, the declared Apache 2.0 with LLVM
+Exception project license, exact Modular licenses and notices, provenance, and
+Swift-compatible checksums. Final publication identity and exact clean
+production-tuple evidence are regenerated for each release.
 
 The architecture deliberately keeps platform knowledge out of application
 Mojo. Library authors use the normal APIs:
@@ -49,8 +52,14 @@ Supported and gated now:
   `DeviceContext` → generic coroutine-lowering route;
 - CPU async functions, suspension/resumption, results, and raised errors through
   generic coroutine lowering and the normal AsyncRT ABI;
+- ownership/destruction, generics, traits, errors, FFI, callbacks, immutable
+  globals, CPU atomics, SIMD, bit, math, vectorization, and
+  optimization-sensitive cases in the fourteen-family conformance corpus;
 - simultaneous calls from Swift-owned threads;
-- iPhone/iPadOS device and ARM64 Simulator slices at O0 and O3.
+- process-resident runtime ownership, quiescent global teardown, and
+  same-compiler-tuple composition of independently compiled Mojo libraries;
+- macOS, ARM64 iPhone/iPad Simulator, and physical iPad execution at O0 and O3,
+  with generated-Mojo and runtime ASan/TSan coverage where applicable.
 
 The Metal feasibility slice uses the same `DeviceContext`, `DeviceBuffer`,
 kernel compilation, and enqueue APIs as other accelerators. Its useful MVP now

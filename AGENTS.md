@@ -11,6 +11,20 @@ Treat an upstream-compatible missing lowering, Darwin implementation, runtime
 operation, target backend operation, or packaging step as the work. Do not make
 an iOS special case look complete by introducing a parallel abstraction.
 
+## Required capability workflow
+
+For every task that plans, implements, tests, reviews, or reports Mojo/MAX
+support for iOS or iPadOS, read and follow
+`.agents/skills/mojo-ios-capability-batch/SKILL.md` before acting, even when the
+user did not name the skill. This is the required fresh-session entry point.
+
+That skill selects the repository scripts for Xcode and Metal discovery,
+source-built Mojo isolation, embedded-runtime builds, Simulator and physical
+device execution, marker handling, source and binary audits, evidence receipts,
+patch verification, and tracker updates. Use those scripts instead of copying
+their mechanics into a new gate. Run `pixi run test-shared-tooling` after
+changing any shared tool or its routing instructions.
+
 ## Architecture requirements
 
 - Until `/Applications/Xcode.app` itself reports Xcode 27, use

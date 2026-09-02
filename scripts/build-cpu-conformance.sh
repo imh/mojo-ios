@@ -2,19 +2,15 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-upstream_root="${MOJO_IOS_UPSTREAM_ROOT:-${project_root}/.work/modular}"
-compiler_path="${MOJO_IOS_MOJO_BINARY:-${upstream_root}/bazel-bin/KGEN/tools/mojo/mojo}"
-stdlib_path="${MOJO_IOS_STDLIB_PATH:-${upstream_root}/mojo/stdlib}"
-max_mojo_path="${MOJO_IOS_MAX_MOJO_PATH:-${upstream_root}/max/mojo}"
-build_root="${project_root}/build/cpu-conformance"
-compiler_state_root="${project_root}/build/compiler-state/cpu-conformance"
-developer_directory="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+source "${project_root}/scripts/lib/apple-toolchain.sh"
+source "${project_root}/scripts/lib/source-mojo.sh"
 
-test -x "${compiler_path}"
-test -d "${stdlib_path}/std"
-test -d "${max_mojo_path}/max"
-test -d "${developer_directory}"
-export DEVELOPER_DIR="${developer_directory}"
+build_root="${project_root}/build/cpu-conformance"
+mojo_ios_select_apple_toolchain
+mojo_ios_configure_source_mojo "${project_root}" cpu-conformance
+upstream_root="${MOJO_IOS_UPSTREAM_ROOT}"
+stdlib_path="${MOJO_IOS_STDLIB_PATH}"
+max_mojo_path="${MOJO_IOS_MAX_MOJO_PATH}"
 
 manifest_path="${project_root}/tests/cpu-conformance/manifest.tsv"
 test -f "${manifest_path}"
@@ -49,12 +45,8 @@ while IFS=$'\t' read -r family fixture_name symbol upstream_provenance expected 
   fixture_names+=("${fixture_stem}")
 done < <(tail -n +2 "${manifest_path}")
 test "${#fixture_names[@]}" -gt 0
-if rg -n \
-    'CompilationTarget\.is_ios|target\.is_ios|ios_parallel|mojo_ios_runtime' \
-    "${project_root}/tests/cpu-conformance"/*.mojo; then
-  echo "CPU conformance fixtures contain an iOS-specific Mojo source path" >&2
-  exit 1
-fi
+"${project_root}/scripts/audit-ordinary-mojo-source.py" \
+  "${project_root}/tests/cpu-conformance"
 
 generated_root="${build_root}/generated"
 generated_runner_path="${generated_root}/GeneratedConformanceRunner.c"
@@ -84,28 +76,6 @@ mkdir -p "${generated_root}"
   printf '      return (int64_t)index + 1;\n'
   printf '    }\n  }\n  return 0;\n}\n'
 } >"${generated_runner_path}"
-runtime_sources=(
-  "${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c"
-  "${upstream_root}/KGEN/lib/CompilerRT/Embedded/Globals.c"
-  "${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c"
-  "${upstream_root}/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c"
-  "${upstream_root}/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c"
-)
-for runtime_source in "${runtime_sources[@]}"; do
-  test -f "${runtime_source}"
-done
-
-mkdir -p \
-  "${compiler_state_root}/data" \
-  "${compiler_state_root}/cache"
-
-compiler_command=(
-  env -u MODULAR_HOME
-  XDG_DATA_HOME="${compiler_state_root}/data"
-  XDG_CACHE_HOME="${compiler_state_root}/cache"
-  MODULAR_CACHE_DIR="${compiler_state_root}/cache/mojo"
-  "${compiler_path}"
-)
 
 build_variant() {
   local variant_name="$1"
@@ -122,7 +92,7 @@ build_variant() {
   local fixture_objects=()
   for fixture_name in "${fixture_names[@]}"; do
     local fixture_object="${variant_root}/${fixture_name}.o"
-    "${compiler_command[@]}" build \
+    mojo_ios_source_mojo build \
       "${project_root}/tests/cpu-conformance/${fixture_name}.mojo" \
       -I "${stdlib_path}" \
       -I "${max_mojo_path}" \
@@ -134,12 +104,10 @@ build_variant() {
       -o "${fixture_object}"
     fixture_objects+=("${fixture_object}")
   done
-  if nm -u \
+  "${project_root}/scripts/audit-macho-contract.py" \
     "${variant_root}/Atomics.o" \
-    "${variant_root}/AtomicConcurrency.o" | grep -Eq '___atomic_'; then
-    echo "CPU atomics unexpectedly require an external atomic helper" >&2
-    exit 1
-  fi
+    "${variant_root}/AtomicConcurrency.o" \
+    --forbid-undefined-regex '^__atomic_'
 
   xcrun --sdk "${sdk_name}" clang \
     -target "${target_triple}" \
@@ -156,21 +124,16 @@ build_variant() {
     -c "${generated_runner_path}" \
     -o "${variant_root}/GeneratedConformanceRunner.o"
 
-  local runtime_objects=()
   local runtime_names=(CompilerRT Globals KGENAsyncRT AppleWorkQueue DeviceContext)
-  local runtime_index=0
-  for runtime_source in "${runtime_sources[@]}"; do
-    local runtime_object="${variant_root}/${runtime_names[${runtime_index}]}.o"
-    xcrun --sdk "${sdk_name}" clang \
-      -target "${target_triple}" \
-      -O"${optimization_level}" \
-      -std=c17 -Wall -Wextra -Werror \
-      -I "${upstream_root}" \
-      -I "${upstream_root}/AsyncRT/include" \
-      -c "${runtime_source}" \
-      -o "${runtime_object}"
-    runtime_objects+=("${runtime_object}")
-    runtime_index=$((runtime_index + 1))
+  local runtime_root="${variant_root}/runtime"
+  "${project_root}/scripts/build-embedded-apple-runtime.sh" \
+    --sdk "${sdk_name}" \
+    --target-triple "${target_triple}" \
+    --optimization "${optimization_level}" \
+    --output-directory "${runtime_root}"
+  local runtime_objects=()
+  for runtime_name in "${runtime_names[@]}"; do
+    runtime_objects+=("${runtime_root}/${runtime_name}.o")
   done
 
   for fixture_name in "${fixture_names[@]}"; do
@@ -182,16 +145,12 @@ build_variant() {
       "${variant_root}/ConformanceSupport.o" \
       "${runtime_objects[@]}" \
       -o "${variant_root}/${fixture_name}.dylib"
-    if nm -u "${variant_root}/${fixture_name}.dylib" |
-      grep -E '_(KGEN_CompilerRT_|AsyncRT_Device)' >/dev/null; then
-      echo "${fixture_name} retained an embedded runtime dependency after full linkage" >&2
-      exit 1
-    fi
-    if nm -u "${variant_root}/${fixture_name}.o" |
-      grep -E '_mojo_ios_.*runtime' >/dev/null; then
-      echo "${fixture_name} depends on a project-specific Mojo runtime ABI" >&2
-      exit 1
-    fi
+    "${project_root}/scripts/audit-macho-contract.py" \
+      "${variant_root}/${fixture_name}.dylib" \
+      --forbid-undefined-regex '^(KGEN_CompilerRT_|AsyncRT_Device)'
+    "${project_root}/scripts/audit-macho-contract.py" \
+      "${variant_root}/${fixture_name}.o" \
+      --forbid-undefined-regex '^mojo_ios_.*runtime'
   done
 
   local library_path="${variant_root}/libCPUConformance.a"
@@ -219,7 +178,7 @@ verify_device_llvm() {
   local optimization_level="$1"
   local variant_root="${build_root}/iphoneos-o${optimization_level}"
   for fixture_name in GlobalConstants Atomics AtomicConcurrency; do
-    "${compiler_command[@]}" build \
+    mojo_ios_source_mojo build \
       "${project_root}/tests/cpu-conformance/${fixture_name}.mojo" \
       -I "${stdlib_path}" \
       -I "${max_mojo_path}" \

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${project_root}/scripts/lib/apple-toolchain.sh"
 build_root="${project_root}/build/cpu-conformance/apps/device"
-developer_directory="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
-export DEVELOPER_DIR="${developer_directory}"
+mojo_ios_select_apple_toolchain
 manifest_path="${project_root}/tests/cpu-conformance/manifest.tsv"
 family_count="$(( $(wc -l <"${manifest_path}") - 1 ))"
 test "${family_count}" -gt 0
@@ -31,34 +31,12 @@ for optimization_level in 0 3; do
   cmake --build "${variant_root}" --config Debug \
     --target MojoIOSCPUConformance -- -allowProvisioningUpdates
   test -d "${app_path}"
-  xcrun devicectl device install app \
-    --device "${MOJO_IOS_CORE_DEVICE_ID}" "${app_path}"
-  : >"${console_log}"
-  xcrun devicectl device process launch \
-    --device "${MOJO_IOS_CORE_DEVICE_ID}" --console --terminate-existing \
-    "${bundle_identifier}" >"${console_log}" 2>&1 &
-  console_process_id=$!
-
-  marker_observed=0
-  for _ in {1..30}; do
-    if grep -Fq "${expected_marker}" "${console_log}"; then
-      marker_observed=1
-      break
-    fi
-    if ! kill -0 "${console_process_id}" 2>/dev/null; then
-      break
-    fi
-    sleep 1
-  done
-  if kill -0 "${console_process_id}" 2>/dev/null; then
-    kill -INT "${console_process_id}" 2>/dev/null || true
-  fi
-  wait "${console_process_id}" 2>/dev/null || true
-  cat "${console_log}"
-  if [[ "${marker_observed}" != 1 ]]; then
-    echo "physical CPU conformance app did not emit its completion marker" >&2
-    exit 1
-  fi
+  "${project_root}/scripts/run-device-app.sh" \
+    --device-id "${MOJO_IOS_CORE_DEVICE_ID}" \
+    --app "${app_path}" \
+    --bundle-id "${bundle_identifier}" \
+    --marker "${expected_marker}" \
+    --log "${console_log}"
 done
 
 echo "CPU_CONFORMANCE_DEVICE_PASS families=${family_count} optimizations=0,3 foreign_threads=yes"

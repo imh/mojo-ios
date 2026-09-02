@@ -57,6 +57,7 @@ build-coreai-device-smoke = "./scripts/build-coreai-device-smoke.sh"
 test-coreai-device = "./scripts/test-coreai-device.sh"
 verify-tracker = "./scripts/verify-tracker-structure.sh"
 install-git-hooks = "./scripts/install-git-hooks.sh"
+test-shared-tooling = "./scripts/test-shared-tooling.sh"
 
 [dependencies]
 mojo = ">=1.0.0,<2"
