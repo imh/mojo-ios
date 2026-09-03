@@ -54,7 +54,8 @@ Supported and gated now:
   generic coroutine lowering and the normal AsyncRT ABI;
 - ownership/destruction, generics, traits, errors, FFI, callbacks, immutable
   globals, CPU atomics, SIMD, bit, math, vectorization, and
-  optimization-sensitive cases in the fourteen-family conformance corpus;
+  optimization-sensitive, control-flow, aggregate, variadic, and indirect-call
+  cases in the nineteen-family conformance corpus;
 - simultaneous calls from Swift-owned threads;
 - process-resident runtime ownership, quiescent global teardown, and
   same-compiler-tuple composition of independently compiled Mojo libraries;

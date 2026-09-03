@@ -5,7 +5,7 @@ that arbitrary portable CPU Mojo is complete.
 
 ## Ordinary-Mojo corpus
 
-The corpus in `tests/cpu-conformance` contains fourteen independent fixtures. Each
+The corpus in `tests/cpu-conformance` contains nineteen independent fixtures. Each
 uses standard Mojo syntax, standard-library imports, and the normal
 `std.runtime.initialize_runtime()` entry convention. None imports an iOS
 module, tests an iOS target flag, calls a project runtime API, or uses a custom
@@ -27,12 +27,20 @@ closure convention.
 | Strict math | Standard rounding, roots, FMA, transcendental operations, and IEEE edge classifications across supported floating types | `mojo/stdlib/test/math/test_math.mojo` |
 | Vectorized memory | Standard vectorization, unaligned access, masked access, odd tails, and generated-Mojo ASan coverage | `mojo/stdlib/test/algorithm/test_vectorize.mojo` |
 | Optimization semantics | Strict and explicitly fast floating-point behavior plus optimization-sensitive integer/SIMD operations | `mojo/stdlib/test/builtin/test_simd_fastmath.mojo` |
+| Control flow | Branches, loops, early return, and recursion | `KGEN/test/mojo-parser/statements/control_flow.mojo` and related integration tests |
+| Aggregate values | Tuple returns, unpacking, nested access, and conditional values | `KGEN/test/mojo-parser/exprs/tuple_exprs.mojo` |
+| Variadic packs | Runtime construction, iteration, and forwarding | `mojo/stdlib/test/builtin/test_variadic.mojo` |
+| Indirect calls | Overloads, thin function values, indirect calls, and generic function thunks | `KGEN/test/mojo-integration/function_ptr.mojo` |
+| Aggregate calling conventions | Register-passable and memory-only arguments and results | `KGEN/test/mojo-integration/conditional_register_passable_lowering.mojo` |
 
 The final three families and the generic mutable-global/TLS boundary are
 detailed in [CPU_STATE_GATE.md](CPU_STATE_GATE.md).
 The final five numeric families, their oracle policy, generic lowering
 regression, LLVM audit, external-symbol attribution, and generated-Mojo ASan
 evidence are detailed in [CPU_NUMERICS_GATE.md](CPU_NUMERICS_GATE.md).
+The five core-language families, upstream routing inventory, calling-convention
+audit, and expanded execution evidence are detailed in
+[CPU_CORE_LANGUAGE_GATE.md](CPU_CORE_LANGUAGE_GATE.md).
 
 `tests/cpu-conformance/manifest.tsv` is the machine-readable build inventory,
 expected-result record, and provenance input. It is not a support-status
@@ -55,12 +63,12 @@ repeats the complete corpus from simultaneous Swift-owned dispatch threads.
 The Swift app is only the C-ABI test host; it does not change the Mojo
 semantics.
 
-On 2026-09-01, using Xcode 27 beta build 27A5252f, all matrix gates passed:
+On 2026-09-02, using Xcode 27 beta build 27A5252f, all matrix gates passed:
 
 ```text
-CPU_CONFORMANCE_BUILD_PASS families=14 variants=3 optimizations=0,3 independent_link=yes
-CPU_CONFORMANCE_SIMULATOR_PASS families=14 devices=iphone,ipad optimizations=0,3
-CPU_CONFORMANCE_DEVICE_PASS families=14 optimizations=0,3 foreign_threads=yes
+CPU_CONFORMANCE_BUILD_PASS families=19 variants=3 optimizations=0,3 independent_link=yes
+CPU_CONFORMANCE_SIMULATOR_PASS families=19 devices=iphone,ipad optimizations=0,3
+CPU_CONFORMANCE_DEVICE_PASS families=19 optimizations=0,3 foreign_threads=yes
 RUNTIME_ABI_CENSUS_PASS total=68 compilerrt=49 device_context=19 compile_time_rejected=7 implemented=61
 ```
 
@@ -113,9 +121,9 @@ in [CPU_NUMERICS_GATE.md](CPU_NUMERICS_GATE.md). Process-resident runtime
 lifecycle, same-tuple multi-library composition, broad generated-Mojo ASan, and
 release-equivalent TSan are now proved in
 [CPU_RUNTIME_LIFECYCLE_GATE.md](CPU_RUNTIME_LIFECYCLE_GATE.md). M2 remains open
-for the broader portable-language inventory and missing target lanes. Those
-capabilities must be proved through the same normal paths or rejected by name
-without fallback.
+for the remaining portable memory, collection, iteration, reflection, and
+closure families plus missing target lanes. Those capabilities must be proved
+through the same normal paths or rejected by name without fallback.
 
 Run:
 

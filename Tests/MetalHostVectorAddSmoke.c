@@ -38,8 +38,9 @@ int main(void) {
   status = mojo_ios_metal_reject_cuda_launch_attribute();
   assert(status == 0);
 
-  puts("verified Mojo scalar captures, 3D dispatch, multi-kernel composition, "
-       "threadgroup memory, and explicit launch-attribute rejection through "
-       "the standard Metal DeviceContext");
+  puts("verified Mojo heterogeneous arguments, scalar/SIMD/struct captures, "
+       "nested and repeated device pointers, 3D dispatch, multi-kernel "
+       "composition, threadgroup memory, and explicit launch-attribute "
+       "rejection through the standard Metal DeviceContext");
   return 0;
 }

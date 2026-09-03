@@ -1,5 +1,5 @@
 diff --git a/AsyncRT/BUILD.bazel b/AsyncRT/BUILD.bazel
-index 5df0b2db1c..0cad10ff15 100644
+index 5df0b2db1c12ab978176275d619962de0ab5b195..0cad10ff15c0fe6393bda53dfacaf93b48bc3cb3 100644
 --- a/AsyncRT/BUILD.bazel
 +++ b/AsyncRT/BUILD.bazel
 @@ -1,4 +1,5 @@
@@ -72,7 +72,7 @@ index 5df0b2db1c..0cad10ff15 100644
      srcs = glob(["lib/Runtime/Globals/*.cpp"]),
 diff --git a/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h b/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h
 new file mode 100644
-index 0000000000..b38c09c9f6
+index 0000000000000000000000000000000000000000..b38c09c9f6ae121a0fd64617c2c41f771c8bf8ae
 --- /dev/null
 +++ b/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h
 @@ -0,0 +1,78 @@
@@ -156,7 +156,7 @@ index 0000000000..b38c09c9f6
 +#endif // ASYNCRT_RUNTIME_DEVICE_CONTEXT_C_API_H
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h b/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h
 new file mode 100644
-index 0000000000..612c6a8b4a
+index 0000000000000000000000000000000000000000..612c6a8b4a49f0614e02f2fb123f026a4dd528aa
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h
 @@ -0,0 +1,42 @@
@@ -204,7 +204,7 @@ index 0000000000..612c6a8b4a
 +#endif // ASYNCRT_RUNTIME_APPLE_DEVICE_CONTEXT_INTERNAL_H
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c
 new file mode 100644
-index 0000000000..68ff88fdc7
+index 0000000000000000000000000000000000000000..68ff88fdc72055228a33bb07a5a804f2f56e5e70
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c
 @@ -0,0 +1,164 @@
@@ -374,7 +374,7 @@ index 0000000000..68ff88fdc7
 +#endif
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.h b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.h
 new file mode 100644
-index 0000000000..5f56e4b20a
+index 0000000000000000000000000000000000000000..5f56e4b20a1d15577209a44691af1bd95019efe1
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.h
 @@ -0,0 +1,28 @@
@@ -408,7 +408,7 @@ index 0000000000..5f56e4b20a
 +#endif // ASYNCRT_RUNTIME_APPLE_WORK_QUEUE_H
 diff --git a/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
 new file mode 100644
-index 0000000000..e01e03f46a
+index 0000000000000000000000000000000000000000..e01e03f46a94be57dfa71c2d5ff4b4004c285e5f
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
 @@ -0,0 +1,288 @@
@@ -702,10 +702,10 @@ index 0000000000..e01e03f46a
 +}
 diff --git a/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
 new file mode 100644
-index 0000000000..c0623d4d95
+index 0000000000000000000000000000000000000000..429ac924cb80b3bdf4349ff2444f1840d27b130d
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
-@@ -0,0 +1,879 @@
+@@ -0,0 +1,893 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -721,6 +721,7 @@ index 0000000000..c0623d4d95
 +
 +#include <assert.h>
 +#include <limits.h>
++#include <stddef.h>
 +#include <stdatomic.h>
 +#include <stdbool.h>
 +#include <stdint.h>
@@ -785,6 +786,19 @@ index 0000000000..c0623d4d95
 +  int32_t buffer_count;
 +  int32_t device_pointer_fixup_count;
 +} AsyncRTMetalEnqueueFunctionArguments;
++
++_Static_assert(offsetof(AsyncRTMetalEnqueueFunctionArguments,
++                        argument_sizes) == sizeof(void *),
++               "Metal argument-size ABI offset drifted from Mojo");
++_Static_assert(offsetof(AsyncRTMetalEnqueueFunctionArguments,
++                        device_pointer_byte_offsets) == 5 * sizeof(void *),
++               "Metal device-pointer-fixup ABI offset drifted from Mojo");
++_Static_assert(offsetof(AsyncRTMetalEnqueueFunctionArguments, buffer_count) ==
++                   6 * sizeof(void *),
++               "Metal buffer-count ABI offset drifted from Mojo");
++_Static_assert(sizeof(AsyncRTMetalEnqueueFunctionArguments) ==
++                   6 * sizeof(void *) + 2 * sizeof(int32_t),
++               "Metal enqueue-argument ABI size drifted from Mojo");
 +
 +// This must match max.gpu.host.LaunchAttribute.  Launch attributes are a
 +// CUDA-shaped API; Metal accepts IGNORE entries and diagnoses every concrete
@@ -1586,7 +1600,7 @@ index 0000000000..c0623d4d95
 +  }
 +}
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 3e759c983d..d79800d651 100644
+index 3e759c983d077baf7c997c07f8322a426a02a2e8..d79800d6510d86da77c1babc3e67aac9dd040f7d 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -175,6 +175,16 @@ config_setting(
@@ -1607,7 +1621,7 @@ index 3e759c983d..d79800d651 100644
      name = "lint",
      actual = "//bazel/lint",
 diff --git a/KGEN/BUILD.bazel b/KGEN/BUILD.bazel
-index cf9ed18d58..9f9831d369 100644
+index cf9ed18d582cc87483aef0c15450bcff4aa0dd5d..9f9831d3699c12402baeaedd3335f72c2841c7a7 100644
 --- a/KGEN/BUILD.bazel
 +++ b/KGEN/BUILD.bazel
 @@ -1002,6 +1002,24 @@ modular_shared_library(
@@ -1635,11 +1649,44 @@ index cf9ed18d58..9f9831d369 100644
  modular_cc_library(
      name = "Support",
      srcs = glob(
+diff --git a/KGEN/include/KGEN/KGENDialect/KGENOps.td b/KGEN/include/KGEN/KGENDialect/KGENOps.td
+index 509bbf7d795a938927d144b548f80938197df02d..ba69f18d82cbe17cb77ad401d66bd238fc5b7b67 100644
+--- a/KGEN/include/KGEN/KGENDialect/KGENOps.td
++++ b/KGEN/include/KGEN/KGENDialect/KGENOps.td
+@@ -1914,6 +1914,7 @@ def KGEN_CompileOffloadOp: KGENOp<"compile_offload">  {
+                         AttrOfType<KGEN_StringType>:$emission_option,
+                         AttrOfType<KGEN_StringType>:$emission_link_option,
+                         AttrOfType<AnyType>:$func,
++                        AttrOfType<KGEN_ParamListType>:$argument_types,
+                         OptionalAttr<AttrOfType<Index>>:$kernelID);
+ 
+    let results = (outs AnyType:$result);
+@@ -1923,7 +1924,8 @@ def KGEN_CompileOffloadOp: KGENOp<"compile_offload">  {
+                                  $emission_kind,
+                                  $emission_option,
+                                  $emission_link_option,
+-                                 $func) attr-dict `>` `:` type($result)
++                                 $func,
++                                 $argument_types) attr-dict `>` `:` type($result)
+    }];
+ 
+ 
 diff --git a/KGEN/include/KGEN/ToolCommon/KGENPasses.h b/KGEN/include/KGEN/ToolCommon/KGENPasses.h
-index 0fbfeb3c1e..c1f0e8aaa7 100644
+index 0fbfeb3c1e4b1c7e4861531a493b3ebb43779b1e..437197dbcde1e76efc20e08fab79118f4751046b 100644
 --- a/KGEN/include/KGEN/ToolCommon/KGENPasses.h
 +++ b/KGEN/include/KGEN/ToolCommon/KGENPasses.h
-@@ -159,6 +159,8 @@ struct OffloadCompilationResult {
+@@ -124,6 +124,10 @@ struct OffloadInfo {
+     StringAttr name;
+     uint64_t kernelId;
+     FuncTypeGeneratorType populateFnType;
++    /// Source-declared pointer element types, aligned with kernel arguments.
++    /// Non-pointer entries are UnitAttr. These remain available after
++    /// opaque-pointer lowering erases pointer element types.
++    ArrayAttr pointerElementTypes;
+     llvm::SmallSet<EmitAs, 4> emissionKinds;
+     /// The source-level name of the kernel function (e.g. "add_one_kernel"),
+     /// used to name the GPU ASM output file when --emit=asm is requested.
+@@ -159,6 +163,8 @@ struct OffloadCompilationResult {
    IntegerAttr numCaptures;
    mlir::DenseI64ArrayAttr captureSizes;
    SymbolConstantAttr populate;
@@ -1649,10 +1696,138 @@ index 0fbfeb3c1e..c1f0e8aaa7 100644
  
    /// Hashed module name based on contents.
 diff --git a/KGEN/lib/Compiler/KGENCompiler.cpp b/KGEN/lib/Compiler/KGENCompiler.cpp
-index 221f0a50a7..82090048ad 100644
+index 221f0a50a76ff71eda24709e4bd188cb5f51962b..6055052749e28e461d46aa35265c6a8f1c0f9d50 100644
 --- a/KGEN/lib/Compiler/KGENCompiler.cpp
 +++ b/KGEN/lib/Compiler/KGENCompiler.cpp
-@@ -755,6 +755,9 @@ static ElaboratorCompileOffloadRetType compileOffloads(
+@@ -19,6 +19,7 @@
+ #include "KGEN/Compiler/SaveAsmOutput.h"
+ #include "KGEN/ExecutionEngine/JIT/StaticArchiveLayer.h"
+ #include "KGEN/KGENDialect/KGENOps.h"
++#include "KGEN/KGENDialect/KGENUtils.h"
+ #include "KGEN/POPDialect/POPOps.h"
+ #include "KGEN/Support/BuildInfo.h"
+ #include "KGEN/Support/CompilerProfiling.h"
+@@ -60,6 +61,60 @@
+ using namespace M;
+ using namespace KGEN;
+ 
++static constexpr llvm::StringLiteral kOffloadPointeeTypeMetadata =
++    "kgen.offload.pointee_type";
++
++/// Preserve the source-declared pointee type on each offload entry argument.
++/// Pointer element types are otherwise intentionally erased by the ordinary
++/// opaque-pointer ABI before target backends consume the module.
++static ErrorOrSuccess attachOffloadArgumentTypes(
++    GeneratorOp entry, ArrayAttr pointerElementTypes) {
++  if (pointerElementTypes.size() != entry.getNumArguments())
++    return Error(llvm::formatv(
++        "compile_offload argument type count {0} does not match kernel "
++        "argument count {1}",
++        pointerElementTypes.size(), entry.getNumArguments()));
++
++  MLIRContext *context = entry.getContext();
++  SmallVector<Attribute> argumentMetadata;
++  if (ArrayAttr existing = entry.getLLVMArgMetadataArrayAttr();
++      !existing.empty())
++    argumentMetadata.assign(existing.begin(), existing.end());
++  else
++    argumentMetadata.assign(pointerElementTypes.size(),
++                            ArrayAttr::get(context, {}));
++
++  for (auto [index, pointerElementType] :
++       llvm::enumerate(pointerElementTypes)) {
++    auto elementTypeAttribute = dyn_cast<TypeAttr>(pointerElementType);
++    if (!elementTypeAttribute)
++      continue;
++    Type elementType = elementTypeAttribute.getValue();
++    std::string descriptor;
++    if (auto simdType = sugarDynCast<SIMDType>(elementType)) {
++      std::optional<int64_t> width = simdType.getResolvedSize();
++      std::optional<KGENDType> dtype = simdType.getResolvedDType();
++      if (width && dtype)
++        descriptor = llvm::formatv("simd:{0}:{1}", *width,
++                                   dtype->getAsString())
++                         .str();
++    }
++    if (descriptor.empty()) {
++      llvm::raw_string_ostream stream(descriptor);
++      elementType.print(stream);
++    }
++
++    SmallVector<Attribute> metadata =
++        llvm::to_vector(cast<ArrayAttr>(argumentMetadata[index]));
++    metadata.push_back(StringAttr::get(context, kOffloadPointeeTypeMetadata));
++    metadata.push_back(StringAttr::get(context, descriptor));
++    argumentMetadata[index] = ArrayAttr::get(context, metadata);
++  }
++
++  entry.setLLVMArgMetadataArrayAttr(ArrayAttr::get(context, argumentMetadata));
++  return success();
++}
++
+ //===----------------------------------------------------------------------===//
+ // compileElaboratorAsm
+ //===----------------------------------------------------------------------===//
+@@ -67,7 +122,7 @@ using namespace KGEN;
+ /// Generate a stub function that calls into the sliced function with input
+ /// parameters, then rename it to match the expected symbol name and export it
+ /// This is how compilation is rooted at instantiations of parametric functions.
+-static void
++static GeneratorOp
+ generateInstantiateStub(GeneratorOp func, SymbolConstantAttr symbol,
+                         StringAttr name, IRMapping &mapping,
+                         SymbolTable *symtab = nullptr,
+@@ -151,6 +206,7 @@ generateInstantiateStub(GeneratorOp func, SymbolConstantAttr symbol,
+       b, SymbolConstantAttr::get(stubName, sigGen, symbol.getParamValues()),
+       entry->getArguments());
+   ReturnOp::create(b, call.getResults());
++  return wrapper;
+ }
+ 
+ /// Find a FuncOp in the module by its kgen.offload.kernelid LLVM metadata.
+@@ -550,6 +606,7 @@ static ElaboratorCompileOffloadRetType compileOffloads(
+ 
+         std::optional<StringAttr> newName;
+         for (auto [symbol, kernelInfo] : symbolInfo) {
++          GeneratorOp kernelEntry;
+           if (!symbol.getParamValues().empty()) {
+             // Add "_callee" postfix to the generator that is both a callee of a
+             // kernel and a kernel entry function itself. So that we don't end
+@@ -565,11 +622,13 @@ static ElaboratorCompileOffloadRetType compileOffloads(
+                   }
+                 });
+ 
+-            generateInstantiateStub(func, symbol, kernelInfo.name, mapping,
+-                                    &slicedSymtab, kernelInfo.kernelId);
++            kernelEntry = generateInstantiateStub(
++                func, symbol, kernelInfo.name, mapping, &slicedSymtab,
++                kernelInfo.kernelId);
+           } else {
+             // Set kernelId
+             GeneratorOp sliced = cast<GeneratorOp>(mapping.lookup(func));
++            kernelEntry = sliced;
+             ImplicitLocOpBuilder b(func.getLoc(), OpBuilder(sliced));
+             SmallVector<Attribute> metadataArray =
+                 llvm::to_vector(sliced.getLLVMMetadataArrayAttr().getValue());
+@@ -579,6 +638,17 @@ static ElaboratorCompileOffloadRetType compileOffloads(
+             sliced.setLLVMMetadataArrayAttr(
+                 ArrayAttr::get(sliced.getContext(), metadataArray));
+           }
++          // An empty list is the established compile_info path, which does
++          // not declare launch argument types. Preserve that path for targets
++          // that do not consume this metadata. Normal DeviceContext launches
++          // provide a complete list; target backends such as Metal diagnose
++          // missing metadata when they require it.
++          if (!kernelInfo.pointerElementTypes.empty()) {
++            if (ErrorOrSuccess result = attachOffloadArgumentTypes(
++                    kernelEntry, kernelInfo.pointerElementTypes);
++                result.isError())
++              return result.takeError();
++          }
+         }
+         if (newName) {
+           // Rename the generator since it is used both as kernel entry function
+@@ -755,6 +825,9 @@ static ElaboratorCompileOffloadRetType compileOffloads(
          OwningOpRef<FuncOp> func = std::move(iter->second.func);
          unsigned numCaptures = iter->second.numCaptures;
          mlir::DenseI64ArrayAttr captureSizes = iter->second.captureSizes;
@@ -1662,7 +1837,7 @@ index 221f0a50a7..82090048ad 100644
  
          auto populate = cast<FuncOp>(func.get());
          auto populateFnRef = SymbolConstantAttr::get(populate);
-@@ -816,12 +819,13 @@ static ElaboratorCompileOffloadRetType compileOffloads(
+@@ -816,12 +889,13 @@ static ElaboratorCompileOffloadRetType compileOffloads(
          }
  
          targetResult.insert(
@@ -1683,7 +1858,7 @@ index 221f0a50a7..82090048ad 100644
  
        // Reset the global llvm options once compiling this target is done.
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h
-index b71bd3bc86..8a5d9f7271 100644
+index b71bd3bc86cf4dd00226cb22a55e8bd41f0dcb6a..8a5d9f727135806c5048f3ff513c98d64a409e05 100644
 --- a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h
 @@ -35,6 +35,14 @@ class raw_ostream;
@@ -1703,10 +1878,10 @@ index b71bd3bc86..8a5d9f7271 100644
  /// required for Metal compatibility.
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
 new file mode 100644
-index 0000000000..790b4af6ce
+index 0000000000000000000000000000000000000000..b0b2bd4774c2282c94afb00e9c57fb9970241f96
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
-@@ -0,0 +1,663 @@
+@@ -0,0 +1,774 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -1733,6 +1908,8 @@ index 0000000000..790b4af6ce
 +namespace {
 +
 +constexpr llvm::StringLiteral kMetalKernelAttribute = "metal.kernel";
++constexpr llvm::StringLiteral kOffloadPointeeTypesAttribute =
++    "kgen.offload.pointee_types";
 +constexpr llvm::StringLiteral kMetalAIRLoweringErrorMetadata =
 +    "mojo.metal.air_lowering_error";
 +
@@ -1802,6 +1979,78 @@ index 0000000000..790b4af6ce
 +  return fallbackType;
 +}
 +
++static llvm::Expected<llvm::Type *>
++getKernelBufferElementType(const llvm::Function &kernel,
++                           const llvm::Argument &argument) {
++  llvm::Attribute attribute = kernel.getFnAttribute(
++      kOffloadPointeeTypesAttribute);
++  if (!attribute.isStringAttribute() || attribute.getValueAsString().empty())
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        "Metal kernel '" + kernel.getName() + "' pointer argument #" +
++            llvm::Twine(argument.getArgNo()) +
++            " is missing explicit element-type metadata");
++  llvm::SmallVector<llvm::StringRef> descriptors;
++  attribute.getValueAsString().split(descriptors, ';', /*MaxSplit=*/-1,
++                                     /*KeepEmpty=*/true);
++  if (descriptors.size() != kernel.arg_size())
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        "Metal kernel argument type metadata count does not match the kernel "
++        "signature");
++  llvm::StringRef descriptor = descriptors[argument.getArgNo()];
++  if (descriptor == "-")
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        "Metal kernel pointer argument has no declared element type");
++
++  llvm::SmallVector<llvm::StringRef> fields;
++  descriptor.split(fields, ':');
++  if (fields.size() != 3 || fields[0] != "simd")
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        "Metal kernel pointer argument element type is not implemented: " +
++            descriptor);
++  uint64_t width = 0;
++  if (fields[1].getAsInteger(10, width) || width == 0 || width > UINT32_MAX)
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        "Metal kernel pointer argument has an invalid SIMD width");
++
++  llvm::LLVMContext &context = kernel.getContext();
++  llvm::Type *scalarType = nullptr;
++  llvm::StringRef dtype = fields[2];
++  if (dtype == "bool")
++    scalarType = llvm::Type::getInt1Ty(context);
++  else if (dtype == "int8" || dtype == "uint8" || dtype == "si8" ||
++           dtype == "ui8")
++    scalarType = llvm::Type::getInt8Ty(context);
++  else if (dtype == "int16" || dtype == "uint16" || dtype == "si16" ||
++           dtype == "ui16")
++    scalarType = llvm::Type::getInt16Ty(context);
++  else if (dtype == "int32" || dtype == "uint32" || dtype == "si32" ||
++           dtype == "ui32")
++    scalarType = llvm::Type::getInt32Ty(context);
++  else if (dtype == "int64" || dtype == "uint64" || dtype == "index" ||
++           dtype == "uindex" || dtype == "si64" || dtype == "ui64")
++    scalarType = llvm::Type::getInt64Ty(context);
++  else if (dtype == "float16" || dtype == "f16")
++    scalarType = llvm::Type::getHalfTy(context);
++  else if (dtype == "float32" || dtype == "f32")
++    scalarType = llvm::Type::getFloatTy(context);
++  else if (dtype == "float64" || dtype == "f64")
++    scalarType = llvm::Type::getDoubleTy(context);
++  if (!scalarType)
++    return llvm::createStringError(
++        llvm::inconvertibleErrorCode(),
++        "Metal kernel pointer argument element dtype is not implemented: " +
++            dtype);
++  return width == 1
++             ? scalarType
++             : llvm::FixedVectorType::get(scalarType,
++                                          static_cast<unsigned>(width));
++}
++
 +static llvm::StringRef airTypeName(llvm::Type *type);
 +
 +static llvm::Error validateAIRTypeAndLayout(llvm::Type *type,
@@ -1814,6 +2063,26 @@ index 0000000000..790b4af6ce
 +    return llvm::createStringError(
 +        llvm::inconvertibleErrorCode(),
 +        ("Metal " + description + " layout is not implemented").str());
++  return llvm::Error::success();
++}
++
++static llvm::Error validateNestedMetalPointers(llvm::Type *type) {
++  if (auto *pointerType = llvm::dyn_cast<llvm::PointerType>(type)) {
++    if (pointerType->getAddressSpace() != 1)
++      return llvm::createStringError(
++          llvm::inconvertibleErrorCode(),
++          "Metal constant kernel argument contains a non-global pointer; "
++          "nested device pointers must use AddressSpace.GLOBAL");
++    return llvm::Error::success();
++  }
++  if (auto *structType = llvm::dyn_cast<llvm::StructType>(type)) {
++    for (llvm::Type *fieldType : structType->elements())
++      if (llvm::Error error = validateNestedMetalPointers(fieldType))
++        return error;
++    return llvm::Error::success();
++  }
++  if (auto *arrayType = llvm::dyn_cast<llvm::ArrayType>(type))
++    return validateNestedMetalPointers(arrayType->getElementType());
 +  return llvm::Error::success();
 +}
 +
@@ -1831,12 +2100,11 @@ index 0000000000..790b4af6ce
 +  for (llvm::Function *kernel : kernels) {
 +    for (llvm::Argument &argument : kernel->args()) {
 +      if (argument.getType()->isPointerTy()) {
-+        llvm::Type *elementType = inferBufferElementType(argument);
-+        if (!elementType)
-+          return llvm::createStringError(
-+              llvm::inconvertibleErrorCode(),
-+              "Metal buffer argument element type inference is not "
-+              "implemented");
++        llvm::Expected<llvm::Type *> elementTypeOr =
++            getKernelBufferElementType(*kernel, argument);
++        if (!elementTypeOr)
++          return elementTypeOr.takeError();
++        llvm::Type *elementType = *elementTypeOr;
 +        if (airTypeName(elementType).empty()) {
 +          std::string typeDescription;
 +          llvm::raw_string_ostream stream(typeDescription);
@@ -1854,6 +2122,8 @@ index 0000000000..790b4af6ce
 +
 +      if (llvm::Error error = validateAIRTypeAndLayout(
 +              argument.getType(), layout, "constant kernel argument"))
++        return error;
++      if (llvm::Error error = validateNestedMetalPointers(argument.getType()))
 +        return error;
 +      if (airTypeName(argument.getType()).empty() &&
 +          !argument.getType()->isAggregateType())
@@ -1906,10 +2176,8 @@ index 0000000000..790b4af6ce
 +}
 +
 +static llvm::StringRef airTypeName(llvm::Type *type) {
-+  if (auto *vectorType = llvm::dyn_cast<llvm::FixedVectorType>(type)) {
-+    if (vectorType->getNumElements() == 1)
-+      type = vectorType->getElementType();
-+  }
++  if (auto *vectorType = llvm::dyn_cast<llvm::FixedVectorType>(type))
++    type = vectorType->getElementType();
 +  if (type->isFloatTy())
 +    return "float";
 +  if (type->isHalfTy())
@@ -2082,10 +2350,10 @@ index 0000000000..790b4af6ce
 +
 +static llvm::MDNode *buildBufferArgumentMetadata(llvm::Function &kernel,
 +                                                 llvm::Argument &argument,
++                                                 llvm::Type *elementType,
 +                                                 uint32_t index) {
-+  llvm::Type *elementType = inferBufferElementType(argument);
 +  assert(elementType &&
-+         "Metal buffer type must be validated before metadata construction");
++         "Metal buffer type must be explicit before metadata construction");
 +  llvm::StringRef typeName = airTypeName(elementType);
 +  assert(!typeName.empty() &&
 +         "Metal buffer type must be validated before metadata construction");
@@ -2100,12 +2368,17 @@ index 0000000000..790b4af6ce
 +  std::string fallbackName = ("argument" + llvm::Twine(index)).str();
 +  llvm::StringRef argumentName =
 +      argument.hasName() ? argument.getName() : fallbackName;
++  llvm::StringRef access = "air.read_write";
++  if (argument.hasAttribute(llvm::Attribute::ReadOnly))
++    access = "air.read";
++  else if (argument.hasAttribute(llvm::Attribute::WriteOnly))
++    access = "air.write";
 +  return metadataNode(
 +      context,
 +      {metadataI32(context, index), metadataString(context, "air.buffer"),
 +       metadataString(context, "air.location_index"),
 +       metadataI32(context, index), metadataI32(context, 1),
-+       metadataString(context, "air.read_write"),
++       metadataString(context, access),
 +       metadataString(context, "air.arg_type_size"),
 +       metadataI32(context, static_cast<uint32_t>(typeSize)),
 +       metadataString(context, "air.arg_type_align_size"),
@@ -2239,6 +2512,7 @@ index 0000000000..790b4af6ce
 +static void
 +addKernelMetadata(llvm::Module &module, llvm::Function &kernel,
 +                  llvm::ArrayRef<llvm::Type *> explicitArgumentTypes,
++                  llvm::ArrayRef<llvm::Type *> explicitBufferElementTypes,
 +                  bool hasDynamicThreadgroupMemory,
 +                  llvm::ArrayRef<UsedMetalBuiltinFamily> usedBuiltinFamilies) {
 +  llvm::LLVMContext &context = module.getContext();
@@ -2246,11 +2520,13 @@ index 0000000000..790b4af6ce
 +  argumentMetadata.reserve(kernel.arg_size());
 +
 +  auto argument = kernel.arg_begin();
++  assert(explicitArgumentTypes.size() == explicitBufferElementTypes.size() &&
++         "Metal kernel argument type metadata must remain aligned");
 +  for (unsigned index = 0; index != explicitArgumentTypes.size();
 +       ++index, ++argument) {
 +    if (explicitArgumentTypes[index]->isPointerTy())
-+      argumentMetadata.push_back(
-+          buildBufferArgumentMetadata(kernel, *argument, index));
++      argumentMetadata.push_back(buildBufferArgumentMetadata(
++          kernel, *argument, explicitBufferElementTypes[index], index));
 +    else
 +      argumentMetadata.push_back(buildConstantArgumentMetadata(
 +          kernel, *argument, explicitArgumentTypes[index], index));
@@ -2333,6 +2609,14 @@ index 0000000000..790b4af6ce
 +  for (llvm::Function *oldKernel : kernels) {
 +    llvm::SmallVector<llvm::Type *> explicitArgumentTypes =
 +        llvm::to_vector(oldKernel->getFunctionType()->params());
++    llvm::SmallVector<llvm::Type *> explicitBufferElementTypes;
++    explicitBufferElementTypes.reserve(oldKernel->arg_size());
++    for (llvm::Argument &argument : oldKernel->args())
++      explicitBufferElementTypes.push_back(
++          argument.getType()->isPointerTy()
++              ? llvm::cantFail(
++                    getKernelBufferElementType(*oldKernel, argument))
++              : nullptr);
 +    llvm::SmallVector<UsedMetalBuiltinFamily> usedBuiltinFamilies;
 +    collectBuiltinCalls(*oldKernel, usedBuiltinFamilies);
 +    llvm::SmallVector<llvm::GlobalVariable *> dynamicThreadgroupGlobals;
@@ -2340,9 +2624,11 @@ index 0000000000..790b4af6ce
 +    llvm::Function *kernel = rewriteKernelABI(*oldKernel, usedBuiltinFamilies,
 +                                              dynamicThreadgroupGlobals);
 +    kernel->removeFnAttr(kMetalKernelAttribute);
++    kernel->removeFnAttr(kOffloadPointeeTypesAttribute);
 +    kernel->removeFnAttr("target-cpu");
 +    kernel->removeFnAttr("target-features");
 +    addKernelMetadata(module, *kernel, explicitArgumentTypes,
++                      explicitBufferElementTypes,
 +                      !dynamicThreadgroupGlobals.empty(), usedBuiltinFamilies);
 +  }
 +
@@ -2372,7 +2658,7 @@ index 0000000000..790b4af6ce
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h
 new file mode 100644
-index 0000000000..a41ca765d1
+index 0000000000000000000000000000000000000000..a41ca765d1a3b5834638bd6b3c6f7bd942ffd2bb
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h
 @@ -0,0 +1,46 @@
@@ -2423,7 +2709,7 @@ index 0000000000..a41ca765d1
 +
 +#endif // KGEN_COMPILER_LLVMIR_TRANSFORMS_METALAIRPASS_H
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp b/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
-index fcd0786720..cebfc34515 100644
+index fcd0786720d9d4f7eb488c20ffdd5681200e8e9e..cebfc34515922581c01a3cfb8afc01cb60f6403e 100644
 --- a/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
 +++ b/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
 @@ -39,6 +39,7 @@
@@ -2448,7 +2734,7 @@ index fcd0786720..cebfc34515 100644
    if (!llvmModule)
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp
 new file mode 100644
-index 0000000000..8af2f6c344
+index 0000000000000000000000000000000000000000..8af2f6c344b8b47347232b86703661d284a69b0d
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp
 @@ -0,0 +1,204 @@
@@ -2658,7 +2944,7 @@ index 0000000000..8af2f6c344
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.h b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.h
 new file mode 100644
-index 0000000000..ab61976090
+index 0000000000000000000000000000000000000000..ab61976090fc28920d47ff69d8d73c236904eaa3
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.h
 @@ -0,0 +1,53 @@
@@ -2717,7 +3003,7 @@ index 0000000000..ab61976090
 +#endif // KGEN_COMPILER_TARGET_METAL_METALBACKEND_H
 diff --git a/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c b/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c
 new file mode 100644
-index 0000000000..1a9f8da4c3
+index 0000000000000000000000000000000000000000..1a9f8da4c33f3333edbbe1216c09954c11d026e3
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c
 @@ -0,0 +1,409 @@
@@ -3132,7 +3418,7 @@ index 0000000000..1a9f8da4c3
 +}
 diff --git a/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c b/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c
 new file mode 100644
-index 0000000000..596483500b
+index 0000000000000000000000000000000000000000..596483500bdff51f2b901a6c02cd8536d2adaaa4
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c
 @@ -0,0 +1,230 @@
@@ -3368,7 +3654,7 @@ index 0000000000..596483500b
 +}
 diff --git a/KGEN/lib/CompilerRT/Embedded/Globals.c b/KGEN/lib/CompilerRT/Embedded/Globals.c
 new file mode 100644
-index 0000000000..e56e9fcb3c
+index 0000000000000000000000000000000000000000..e56e9fcb3c5a75353f59d012b56424563b68c603
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Globals.c
 @@ -0,0 +1,312 @@
@@ -3685,10 +3971,81 @@ index 0000000000..e56e9fcb3c
 +  }
 +}
 diff --git a/KGEN/lib/Elaborator/Elaborator.cpp b/KGEN/lib/Elaborator/Elaborator.cpp
-index 0fe694d9c6..5d7fe654dc 100644
+index 0fe694d9c62e0b2eb31e59c62b0474b2baa71fe1..11d3b0fbaedc3aa8bf683287a7feb9073ab7e27d 100644
 --- a/KGEN/lib/Elaborator/Elaborator.cpp
 +++ b/KGEN/lib/Elaborator/Elaborator.cpp
-@@ -2086,7 +2086,8 @@ ElaborationState Elaborator::processCompileOffload(ImplNode *parent,
+@@ -1974,6 +1974,60 @@ ErrorTreeOrSuccess Elaborator::bundleCompileOffloadOp(CompileOffloadOp op,
+   if (offloadFuncOr.isError())
+     return offloadFuncOr.takeError();
+   auto [symbol, func] = offloadFuncOr.takeValue();
++  auto argumentTypes = cast<ParamListAttr>(op.getArgumentTypesAttr());
++
++  SmallVector<Attribute> pointerElementTypes;
++  pointerElementTypes.reserve(argumentTypes.getValues().size());
++  for (auto [argumentIndex, argumentType] :
++       llvm::enumerate(argumentTypes.getValues())) {
++    auto typeParameter = sugarDynCast<TypeParamAttr>(argumentType);
++    if (!typeParameter)
++      return ErrorTree(op.getLoc(),
++                       "compile_offload argument type is not concrete");
++    auto pointerType = sugarDynCast<PointerType>(typeParameter.getMlirType());
++    if (!pointerType) {
++      pointerElementTypes.push_back(UnitAttr::get(op.getContext()));
++      continue;
++    }
++
++    Type elementType = pointerType.getElementType();
++    if (isa<KGEN::NoneType>(elementType)) {
++      auto instanceReference = dyn_cast_if_present<TypeInstanceRefAttr>(
++          getTypeRefForTypeValueIfResolved(typeParameter));
++      if (!instanceReference)
++        return ErrorTree(
++            op.getLoc(),
++            ("compile_offload pointer argument #" +
++             llvm::Twine(argumentIndex) +
++             " has no concrete source type")
++                .str());
++      ImplNode *instance = lookupImplNode(instanceReference.getSymbol());
++      bool foundElementType = false;
++      for (auto [declaration, value] :
++           llvm::zip(instance->parent->gen.getInputParams(),
++                     instance->parent->inputParams)) {
++        if (declaration.getName() != "T")
++          continue;
++        auto elementTypeParameter = sugarDynCast<TypeParamAttr>(value);
++        if (!elementTypeParameter)
++          return ErrorTree(op.getLoc(),
++                           "compile_offload pointer element is not a type");
++        elementType = elementTypeParameter.getMlirType();
++        foundElementType = true;
++        break;
++      }
++      if (!foundElementType)
++        return ErrorTree(
++            op.getLoc(),
++            ("compile_offload pointer argument #" +
++             llvm::Twine(argumentIndex) +
++             " has no declared element type")
++                .str());
++    }
++    pointerElementTypes.push_back(TypeAttr::get(elementType));
++  }
++  ArrayAttr pointerElementTypeArray =
++      ArrayAttr::get(op.getContext(), pointerElementTypes);
+ 
+   // Construct the expected result type.
+   MLIRContext *ctx = op.getContext();
+@@ -2055,7 +2109,8 @@ ErrorTreeOrSuccess Elaborator::bundleCompileOffloadOp(CompileOffloadOp op,
+     auto pair = iter->second.insert(
+         {symbol,
+          OffloadInfo::KernelInfo{
+-             name, offloadInfo.numKernels, populateFnType, {}, sourceName}});
++             name, offloadInfo.numKernels, populateFnType,
++             pointerElementTypeArray, {}, sourceName}});
+ 
+     if (pair.second)
+       offloadInfo.numKernels += 1;
+@@ -2086,7 +2141,8 @@ ElaborationState Elaborator::processCompileOffload(ImplNode *parent,
    if (changedAttrs)
      op->setAttrs(newAttrs);
  
@@ -3698,7 +4055,7 @@ index 0fe694d9c6..5d7fe654dc 100644
    if (offloadFuncOr.isError()) {
      parent->setToError(offloadFuncOr.takeError());
      return ElaborationState::error();
-@@ -2109,6 +2110,15 @@ ElaborationState Elaborator::processCompileOffload(ImplNode *parent,
+@@ -2109,6 +2165,15 @@ ElaborationState Elaborator::processCompileOffload(ImplNode *parent,
      op.setFuncAttr(symbol);
    }
  
@@ -3714,7 +4071,7 @@ index 0fe694d9c6..5d7fe654dc 100644
    compileOffloadOps.modify([&](auto &set) { set.insert(op); });
  
    return ElaborationState::advance();
-@@ -2666,12 +2676,14 @@ static WalkResult rewriteCompileOffloadOp(
+@@ -2666,12 +2731,14 @@ static WalkResult rewriteCompileOffloadOp(
  
    ImplicitLocOpBuilder b(op.getLoc(), OpBuilder(op));
    StringAttr content = iter->second.contents[emissionKind];
@@ -3729,7 +4086,7 @@ index 0fe694d9c6..5d7fe654dc 100644
                                                            moduleName.getType(),
                                                            numCaptures.getType(),
                                                            nonePtr,
-@@ -2680,6 +2692,7 @@ static WalkResult rewriteCompileOffloadOp(
+@@ -2680,6 +2747,7 @@ static WalkResult rewriteCompileOffloadOp(
    SmallVector<Value> values;
  
    auto constantV = ParamConstantOp::create(b, content);
@@ -3737,7 +4094,7 @@ index 0fe694d9c6..5d7fe654dc 100644
    auto moduleNameV = ParamConstantOp::create(b, moduleName);
    auto numCapturesV = ParamConstantOp::create(b, numCaptures);
    // Allocate an array numCaptures elements of int64 integers to store capture
-@@ -2698,6 +2711,7 @@ static WalkResult rewriteCompileOffloadOp(
+@@ -2698,6 +2766,7 @@ static WalkResult rewriteCompileOffloadOp(
    assert(numCaptures.getInt() == captureSizes.size() &&
           "Num captures and number of their sizes mismatch");
    values.push_back(constantV);
@@ -3746,7 +4103,7 @@ index 0fe694d9c6..5d7fe654dc 100644
    values.push_back(numCapturesV);
    values.push_back(opaqueCaptureSizesV);
 diff --git a/KGEN/lib/Elaborator/IREvaluatorContext.cpp b/KGEN/lib/Elaborator/IREvaluatorContext.cpp
-index 3229d05f57..152c6f781d 100644
+index 3229d05f57e3bd233c7064977a3752a63e38db99..152c6f781d7166652bb567ef659fb234dedf0647 100644
 --- a/KGEN/lib/Elaborator/IREvaluatorContext.cpp
 +++ b/KGEN/lib/Elaborator/IREvaluatorContext.cpp
 @@ -58,7 +58,8 @@ SymbolConstantAttr KGEN::extractSymbolConstantAttr(TypedAttr attr) {
@@ -3827,7 +4184,7 @@ index 3229d05f57..152c6f781d 100644
    MLIRContext *ctx = compileOffloadClosureAttr.getContext();
    auto noneType = KGEN::NoneType::get(ctx);
 diff --git a/KGEN/lib/Elaborator/IREvaluatorContext.h b/KGEN/lib/Elaborator/IREvaluatorContext.h
-index 50e73571cc..4359a95347 100644
+index 50e73571cc4a134cff1d24d2fe5a024b957fe4ce..4359a95347f6a601ff5067aeb304a5e309d25fae 100644
 --- a/KGEN/lib/Elaborator/IREvaluatorContext.h
 +++ b/KGEN/lib/Elaborator/IREvaluatorContext.h
 @@ -303,10 +303,13 @@ struct OffloadFunc {
@@ -3848,10 +4205,81 @@ index 50e73571cc..4359a95347 100644
  } // namespace M::KGEN
  
 diff --git a/KGEN/lib/Elaborator/ParametricElaborator.cpp b/KGEN/lib/Elaborator/ParametricElaborator.cpp
-index 21a4aed0bd..300bbc7a29 100644
+index 21a4aed0bd627bf9881162022d3af99aa4fdb309..0d577f8e05cccca00e51da227b5021c81473052b 100644
 --- a/KGEN/lib/Elaborator/ParametricElaborator.cpp
 +++ b/KGEN/lib/Elaborator/ParametricElaborator.cpp
-@@ -1994,7 +1994,8 @@ ParametricElaborator::processCompileOffload(PImplNode *parent,
+@@ -1889,6 +1889,60 @@ ParametricElaborator::bundleCompileOffloadOp(CompileOffloadOp op,
+   if (offloadFuncOr.isError())
+     return offloadFuncOr.takeError();
+   auto [symbol, func] = offloadFuncOr.takeValue();
++  auto argumentTypes = cast<ParamListAttr>(op.getArgumentTypesAttr());
++
++  SmallVector<Attribute> pointerElementTypes;
++  pointerElementTypes.reserve(argumentTypes.getValues().size());
++  for (auto [argumentIndex, argumentType] :
++       llvm::enumerate(argumentTypes.getValues())) {
++    auto typeParameter = sugarDynCast<TypeParamAttr>(argumentType);
++    if (!typeParameter)
++      return ErrorTree(op.getLoc(),
++                       "compile_offload argument type is not concrete");
++    auto pointerType = sugarDynCast<PointerType>(typeParameter.getMlirType());
++    if (!pointerType) {
++      pointerElementTypes.push_back(UnitAttr::get(op.getContext()));
++      continue;
++    }
++
++    Type elementType = pointerType.getElementType();
++    if (isa<KGEN::NoneType>(elementType)) {
++      auto instanceReference = dyn_cast_if_present<TypeInstanceRefAttr>(
++          getTypeRefForTypeValueIfResolved(typeParameter));
++      if (!instanceReference)
++        return ErrorTree(
++            op.getLoc(),
++            ("compile_offload pointer argument #" +
++             llvm::Twine(argumentIndex) +
++             " has no concrete source type")
++                .str());
++      PImplNode *instance = lookupImplNode(instanceReference.getSymbol());
++      bool foundElementType = false;
++      for (auto [declaration, value] :
++           llvm::zip(instance->parent->gen.getInputParams(),
++                     instance->parent->inputParams)) {
++        if (declaration.getName() != "T")
++          continue;
++        auto elementTypeParameter = sugarDynCast<TypeParamAttr>(value);
++        if (!elementTypeParameter)
++          return ErrorTree(op.getLoc(),
++                           "compile_offload pointer element is not a type");
++        elementType = elementTypeParameter.getMlirType();
++        foundElementType = true;
++        break;
++      }
++      if (!foundElementType)
++        return ErrorTree(
++            op.getLoc(),
++            ("compile_offload pointer argument #" +
++             llvm::Twine(argumentIndex) +
++             " has no declared element type")
++                .str());
++    }
++    pointerElementTypes.push_back(TypeAttr::get(elementType));
++  }
++  ArrayAttr pointerElementTypeArray =
++      ArrayAttr::get(op.getContext(), pointerElementTypes);
+ 
+   // Construct the expected result type.
+   MLIRContext *ctx = op.getContext();
+@@ -1962,7 +2016,8 @@ ParametricElaborator::bundleCompileOffloadOp(CompileOffloadOp op,
+     auto pair = iter->second.insert(
+         {symbol,
+          OffloadInfo::KernelInfo{
+-             name, offloadInfo.numKernels, populateFnType, {}, sourceName}});
++             name, offloadInfo.numKernels, populateFnType,
++             pointerElementTypeArray, {}, sourceName}});
+ 
+     if (pair.second)
+       offloadInfo.numKernels += 1;
+@@ -1994,7 +2049,8 @@ ParametricElaborator::processCompileOffload(PImplNode *parent,
    if (changedAttrs)
      op->setAttrs(newAttrs);
  
@@ -3861,7 +4289,7 @@ index 21a4aed0bd..300bbc7a29 100644
    if (offloadFuncOr.isError()) {
      parent->setToError(offloadFuncOr.takeError());
      return ElaborationState::error();
-@@ -2016,6 +2017,14 @@ ParametricElaborator::processCompileOffload(PImplNode *parent,
+@@ -2016,6 +2072,14 @@ ParametricElaborator::processCompileOffload(PImplNode *parent,
      symbol = calleeSym;
      op.setFuncAttr(symbol);
    }
@@ -3876,7 +4304,7 @@ index 21a4aed0bd..300bbc7a29 100644
  
    compileOffloadOps.modify([&](auto &set) { set.insert(op); });
  
-@@ -2486,12 +2495,14 @@ static WalkResult rewriteCompileOffloadOp(
+@@ -2486,12 +2550,14 @@ static WalkResult rewriteCompileOffloadOp(
  
    ImplicitLocOpBuilder b(op.getLoc(), OpBuilder(op));
    StringAttr content = iter->second.contents[emissionKind];
@@ -3891,7 +4319,7 @@ index 21a4aed0bd..300bbc7a29 100644
                                                            moduleName.getType(),
                                                            numCaptures.getType(),
                                                            nonePtr,
-@@ -2499,6 +2510,7 @@ static WalkResult rewriteCompileOffloadOp(
+@@ -2499,6 +2565,7 @@ static WalkResult rewriteCompileOffloadOp(
  
    SmallVector<Value> values;
    auto constantV = ParamConstantOp::create(b, content);
@@ -3899,7 +4327,7 @@ index 21a4aed0bd..300bbc7a29 100644
    auto moduleNameV = ParamConstantOp::create(b, moduleName);
    auto numCapturesV = ParamConstantOp::create(b, numCaptures);
    // Allocate an array numCaptures elements of int64 integers to store capture
-@@ -2518,6 +2530,7 @@ static WalkResult rewriteCompileOffloadOp(
+@@ -2518,6 +2585,7 @@ static WalkResult rewriteCompileOffloadOp(
           "Num captures and number of their sizes mismatch");
  
    values.push_back(constantV);
@@ -3908,7 +4336,7 @@ index 21a4aed0bd..300bbc7a29 100644
    values.push_back(numCapturesV);
    values.push_back(opaqueCaptureSizesV);
 diff --git a/KGEN/lib/KGENDialect/KGENAttrs.cpp b/KGEN/lib/KGENDialect/KGENAttrs.cpp
-index 538bce9fcf..1a5b1a30f1 100644
+index 538bce9fcf2e64f6bf38a30a1a1f4b725be91c5b..1a5b1a30f1c85b3126f1ef0d5e1f150176249724 100644
 --- a/KGEN/lib/KGENDialect/KGENAttrs.cpp
 +++ b/KGEN/lib/KGENDialect/KGENAttrs.cpp
 @@ -3733,8 +3733,9 @@ static Attribute simplifyTargetGetField(SmallVectorImpl<TypedAttr> &operands,
@@ -3933,8 +4361,98 @@ index 538bce9fcf..1a5b1a30f1 100644
    if (field.getValue() == "arch")
      return StringAttr::get(target.getTarget().getArch(), resultType);
    if (field.getValue() == "simd_bit_width")
+diff --git a/KGEN/lib/KGENDialect/KGENOps.cpp b/KGEN/lib/KGENDialect/KGENOps.cpp
+index 04037da59f86aa17132d73dd279a169f5cf20051..612a90777ca7ec28c5727e23e3c5ce91593ec652 100644
+--- a/KGEN/lib/KGENDialect/KGENOps.cpp
++++ b/KGEN/lib/KGENDialect/KGENOps.cpp
+@@ -1742,13 +1742,16 @@ static ParseResult parseCompileOffloadOp(OpAsmParser &p, TypedAttr &targetType,
+                                          TypedAttr &emissionKind,
+                                          TypedAttr &emissionOption,
+                                          TypedAttr &emissionLinkOption,
+-                                         TypedAttr &func) {
++                                         TypedAttr &func,
++                                         TypedAttr &argumentTypes) {
+ 
+   if (parseParamValue(p, targetType, KGEN::TargetType::get(p.getContext())) ||
+       p.parseComma() || parseIndexParamValue(p, emissionKind) ||
+       p.parseComma() || parseStringParam(p, emissionOption) || p.parseComma() ||
+       parseStringParam(p, emissionLinkOption) || p.parseComma() ||
+-      parseTypeParamValue(p, func))
++      parseTypeParamValue(p, func) || p.parseComma() ||
++      parseParamValue(p, argumentTypes,
++                      ParamListType::get(TypeType::get(p.getContext()))))
+     return failure();
+   return success();
+ }
+@@ -1757,7 +1760,7 @@ static void printCompileOffloadOp(OpAsmPrinter &p, Operation *op,
+                                   TypedAttr targetType, TypedAttr emissionKind,
+                                   TypedAttr emissionOption,
+                                   TypedAttr emissionLinkOption,
+-                                  TypedAttr func) {
++                                  TypedAttr func, TypedAttr argumentTypes) {
+ 
+   printParamValue(p, targetType, KGEN::TargetType::get(op->getContext()));
+   p << ", ";
+@@ -1768,6 +1771,9 @@ static void printCompileOffloadOp(OpAsmPrinter &p, Operation *op,
+   printParamValue(p, emissionLinkOption);
+   p << ", ";
+   printTypeParamValue(p, func);
++  p << ", ";
++  printParamValue(p, argumentTypes,
++                  ParamListType::get(TypeType::get(op->getContext())));
+ }
+ 
+ /// If 'value' is defined by one or more rebinds, look through them.
+diff --git a/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp b/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp
+index fa778b7a23765a08d4dfdd763ecbabec31c08114..92bb534fd8278fc3a994c76193348f0afb407361 100644
+--- a/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp
++++ b/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp
+@@ -505,14 +505,27 @@ static LogicalResult convertLLVMMetadata(LLVM::LLVMFuncOp func, FuncType sig,
+   // For each argument and result, leverage signature information to generate
+   // the corresponding LLVM argument and result attributes.
+   SmallVector<Attribute> argAttrs;
++  SmallVector<std::string> offloadPointeeTypes;
++  bool hasOffloadPointeeType = false;
+   for (auto [i, conv, type] :
+        llvm::enumerate(sig.getArgConventions(), sig.getArguments())) {
+     NamedAttrList list;
++    offloadPointeeTypes.emplace_back("-");
+ 
+     if (!argMetadata.empty()) {
+       // `argMetadata` is legalized to either be empty or have same size as the
+       // number of function arguments.
+       for (const NamedAttribute &attr : cast<DictionaryAttr>(argMetadata[i])) {
++        if (attr.getName() == "kgen.offload.pointee_type") {
++          auto descriptor = dyn_cast<StringAttr>(attr.getValue());
++          if (!descriptor)
++            return mlir::emitError(
++                func.getLoc(),
++                "kgen.offload.pointee_type must be a string attribute");
++          offloadPointeeTypes.back() = descriptor.getValue().str();
++          hasOffloadPointeeType = true;
++          continue;
++        }
+         Attribute value = attr.getValue();
+         Dialect *nameDialect = attr.getNameDialect();
+         if (!nameDialect) {
+@@ -571,6 +584,15 @@ static LogicalResult convertLLVMMetadata(LLVM::LLVMFuncOp func, FuncType sig,
+     argAttrs.push_back(list.getDictionary(b.getContext()));
+   }
+ 
++  if (hasOffloadPointeeType) {
++    std::string encoded;
++    llvm::raw_string_ostream stream(encoded);
++    llvm::interleave(offloadPointeeTypes, stream, ";");
++    passthrough.push_back(b.getArrayAttr(
++        {b.getStringAttr("kgen.offload.pointee_types"),
++         b.getStringAttr(encoded)}));
++  }
++
+   // Handle result attributes for pointer return types.
+   // Only apply result attributes for single-result functions, as multiple
+   // KGEN results are packed into a single LLVM struct, and LLVM expects
 diff --git a/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp b/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
-index 71adc27134..e0376d3499 100644
+index 71adc27134aa71af4991aa96ac22d7d0f0d9d568..e0376d34997cc373746b2bf97d9ad0776ef196c6 100644
 --- a/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
 +++ b/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
 @@ -1221,7 +1221,7 @@ static SmallVector<Value> expandOperands(ConversionPatternRewriter &rewriter,
@@ -4101,7 +4619,7 @@ index 71adc27134..e0376d3499 100644
        auto emptyAttrs = rewriter.getDictionaryAttr({});
 diff --git a/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp b/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp
 new file mode 100644
-index 0000000000..b8c1b4a422
+index 0000000000000000000000000000000000000000..b8c1b4a4228c940be6bcd3cba3d3b99f34ff35b0
 --- /dev/null
 +++ b/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp
 @@ -0,0 +1,147 @@
@@ -4253,23 +4771,512 @@ index 0000000000..b8c1b4a422
 +} // namespace
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/MojoParser/ClosureEmitter.cpp b/KGEN/lib/MojoParser/ClosureEmitter.cpp
-index dad2e78a59..4c52a37969 100644
+index dad2e78a59714860e81da8fe16e23db38e4b7bdf..8768b76cb7ee5ae022388111fbd12e024ccd35f8 100644
 --- a/KGEN/lib/MojoParser/ClosureEmitter.cpp
 +++ b/KGEN/lib/MojoParser/ClosureEmitter.cpp
-@@ -3861,6 +3861,11 @@ void ClosureEmitter::buildCallAdaptorAndAddWitness(
+@@ -3572,22 +3572,28 @@ static bool canFunctionSignatureMatchTraitParamInf(FnOp actualFn,
+                           target.getInputParamTypes(),
+                           target.getParamListAttrs(), loc,
+                           /*discardError=*/true);
+-  if (actualExplicitParams.size() != targetExplicitParams.size())
++  bool targetCollectsFixedArguments =
++      target.findPackVarArgIndex().has_value() &&
++      !actualSig.findPackVarArgIndex().has_value();
++  if (!targetCollectsFixedArguments &&
++      actualExplicitParams.size() != targetExplicitParams.size())
+     return false;
+   ParamRefRemapper remapper(actualFn.getInputParams());
+   size_t actualAuxCount = ctx.numStructAuxiliaryParams;
+   size_t targetAuxCount = ctx.traitAuxiliaryParameters.size();
+-  for (auto [index, actualParamType, targetParam] :
+-       llvm::enumerate(actualExplicitParams, targetExplicitParams)) {
+-    Type actualParam = remapper.replace(actualParamType);
+-    if (!isEqualCanon(actualParam, targetParam))
+-      return false;
++  if (!targetCollectsFixedArguments) {
++    for (auto [index, actualParamType, targetParam] :
++         llvm::enumerate(actualExplicitParams, targetExplicitParams)) {
++      Type actualParam = remapper.replace(actualParamType);
++      if (!isEqualCanon(actualParam, targetParam))
++        return false;
+ 
+-    StringAttr actualParamName =
+-        actualFn.getInputParams()[index + actualAuxCount].getName();
+-    inference.setInitialInferredValue(
+-        index + targetAuxCount,
+-        ParamDeclRefAttr::get(actualParamName, actualParam));
++      StringAttr actualParamName =
++          actualFn.getInputParams()[index + actualAuxCount].getName();
++      inference.setInitialInferredValue(
++          index + targetAuxCount,
++          ParamDeclRefAttr::get(actualParamName, actualParam));
++    }
+   }
+   // Bind leading aux (`_A`) to storage aliases before matching args so the
+   // trait-shaped `__call__` compares like the residual promoted layout.
+@@ -3663,11 +3669,13 @@ static bool canFunctionSignatureMatchTraitParamInf(FnOp actualFn,
+       return false;
+     adapteeParts.fnLevelBindings.push_back(aliasValue);
+   }
+-  for (auto [index, explicitParamType] :
+-       llvm::enumerate(targetExplicitParams)) {
+-    StringAttr explicitParamName = target.getParamName(index + targetAuxCount);
+-    adapteeParts.fnLevelBindings.push_back(
+-        ParamDeclRefAttr::get(explicitParamName, explicitParamType));
++  if (!targetCollectsFixedArguments) {
++    for (auto [index, explicitParamType] :
++         llvm::enumerate(targetExplicitParams)) {
++      StringAttr explicitParamName = target.getParamName(index + targetAuxCount);
++      adapteeParts.fnLevelBindings.push_back(
++          ParamDeclRefAttr::get(explicitParamName, explicitParamType));
++    }
+   }
+ 
+   return true;
+@@ -3842,22 +3850,83 @@ void ClosureEmitter::buildCallAdaptorAndAddWitness(
+     expectedTypes.push_back(replacer.replace(arg.getType()));
+   auto calleeSigGen = cast<FnTypeGeneratorType>(callee.getType());
+   auto calleeConventions = calleeSigGen.getArgConventions();
+-
+-  for (auto [arg, targetType, conv] : llvm::zip(
+-           adaptorBlock.getArguments(), expectedTypes, calleeConventions)) {
+-    Value operand = arg;
+-    if (targetType != arg.getType())
++  auto appendCallOperand = [&](Value operand, Type targetType,
++                               ArgConvention convention) {
++    if (targetType != operand.getType())
+       operand = RebindOp::create(b, targetType, operand);
+ 
+     // Handle convention mismatches between the adaptor (trait signature) and
+     // the callee (storage/wrapper `__call__`). Generic trait parameters use
+     // ImmMem (ref), but concrete RegisterPassable types use ImmReg (value).
+-    if (!hasImplicitOrigin(conv) && isa<RefType>(operand.getType()))
++    if (!hasImplicitOrigin(convention) && isa<RefType>(operand.getType()))
+       operand = RefLoadOp::create(b, operand);
+ 
+     callOperands.push_back(operand);
+-    if (hasImplicitOrigin(conv))
++    if (hasImplicitOrigin(convention))
+       origins.push_back(cast<RefType>(operand.getType()).getOrigin());
++  };
++
++  FnTypeGeneratorType adaptorSignature =
++      adaptorFnOp.getFuncTypeGenerator();
++  if (std::optional<size_t> packIndex =
++          adaptorSignature.findPackVarArgIndex()) {
++    assert(!calleeSigGen.findPackVarArgIndex() &&
++           "pack adaptor expects a fixed-arity callee");
++    size_t calleeUserArgumentCount =
++        calleeSigGen.getNumArguments() - calleeSigGen.hasMemoryOnlyResult() -
++        calleeSigGen.isThrows();
++    size_t adaptorUserArgumentCount =
++        adaptorSignature.getNumArguments() -
++        adaptorSignature.hasMemoryOnlyResult() - adaptorSignature.isThrows();
++    assert(*packIndex + 1 == adaptorUserArgumentCount &&
++           "closure trait pack must be the final user argument");
++
++    IREmitter expressionEmitter(structDecl, b);
++    SyntheticNode syntheticNode(structDecl.getLoc());
++    for (size_t calleeArgumentIndex = 0;
++         calleeArgumentIndex < calleeSigGen.getNumArguments();
++         ++calleeArgumentIndex) {
++      Value operand;
++      if (calleeArgumentIndex < *packIndex) {
++        operand = adaptorBlock.getArgument(calleeArgumentIndex);
++      } else if (calleeArgumentIndex < calleeUserArgumentCount) {
++        size_t packElementIndex = calleeArgumentIndex - *packIndex;
++        MBValue packRef(adaptorBlock.getArgument(*packIndex));
++        auto indexAttr =
++            IntegerAttr::get(IndexType::get(ctx), packElementIndex);
++        CValue indexValue = expressionEmitter.emitInt(
++            ASTExprAnd<PValue>{PValue(indexAttr), &syntheticNode},
++            EC_ConversionThunk);
++        SyntheticNode indexNode(structDecl.getLoc(), indexValue);
++        SyntheticNode packNode(structDecl.getLoc(), packRef);
++        Operand subscriptOperand(&indexNode, structDecl.getLoc(),
++                                 ArgUnpackStyle::kKeyword,
++                                 StringAttr::get(ctx, "index"));
++        SubscriptNode subscriptNode(&packNode, structDecl.getLoc(),
++                                    subscriptOperand, structDecl.getLoc());
++        CValue element = expressionEmitter.emitExprCValue(
++            &subscriptNode, EC_ConversionThunk);
++        assert(element && "inferred pack element must be addressable");
++        operand = element.getMlirValue();
++      } else {
++        size_t adaptorArgumentIndex =
++            *packIndex + 1 +
++            (calleeArgumentIndex - calleeUserArgumentCount);
++        operand = adaptorBlock.getArgument(adaptorArgumentIndex);
++      }
++      appendCallOperand(operand,
++                        calleeSigGen.getArgument(calleeArgumentIndex),
++                        calleeConventions[calleeArgumentIndex]);
++    }
++    // This adaptor only unpacks the closure-trait argument before forwarding
++    // to the concrete closure method. Record that concrete callee so offload
++    // compilation and host-side capture-stub naming resolve through the
++    // generic trait witness instead of trying to compile the adaptor itself.
++    adaptorFnOp->setAttr(kTransparentThunkCalleeExprAttr, callee);
++  } else {
++    for (auto [arg, targetType, conv] : llvm::zip(
++             adaptorBlock.getArguments(), expectedTypes, calleeConventions))
++      appendCallOperand(arg, targetType, conv);
    }
    auto callOp = LIT::CallOp::create(b, calleeSigGen.getResultType(), callee,
                                      origins, callOperands);
-+  // This adaptor only rebinds the closure-trait arguments before forwarding
-+  // to the concrete closure method. Record that concrete callee so offload
-+  // compilation and host-side capture-stub naming can resolve through the
-+  // generic trait witness instead of trying to compile the adaptor itself.
-+  adaptorFnOp->setAttr(kTransparentThunkCalleeExprAttr, callee);
-   Value result = callOp.getResult(0);
+@@ -3893,10 +3962,11 @@ void ClosureEmitter::buildCallAdaptorAndAddWitness(
+                       witnesses, fileModule);
+ }
  
-   if (adapteeParts.needsResultConversion) {
+-LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
+-                                                       ASTDecl *traitDecl,
+-                                                       bool rebind) {
++LogicalResult ClosureEmitter::checkStructCompatibility(
++    ASTType structType, TraitSymbolAttr traitSymbol, bool rebind) {
+   // Ensure that we have a valid closure trait and a struct metatype.
++  ASTDecl *traitDecl =
++      &shared.declResolver->getDeclForTypeSymbol(traitSymbol.getSymbol());
+   TraitDeclOp traitDeclOp =
+       llvm::dyn_cast_if_present<TraitDeclOp>(traitDecl->getIfOperation());
+   if (!traitDeclOp)
+@@ -3913,11 +3983,9 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
+     return failure();
+ 
+   // does the struct already conform to the trait?
+-  auto target = TraitSymbolAttr::get(getFullyResolvedSymbolRef(
+-      cast<mlir::SymbolOpInterface>(traitDeclOp.getOperation())));
+   for (TraitSymbolAttr currentTrait :
+        structDeclOp.getCanonicalTrait().getSymbols()) {
+-    if (target == currentTrait) {
++    if (traitSymbol == currentTrait) {
+       return success();
+     }
+   }
+@@ -3949,6 +4017,9 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
+   IREmitter emitter(structDecl, EC_Trait);
+   FnTypeGeneratorType traitSignature = specializeSignature(
+       callFunction, structSelfType.mlirType, *shared.declResolver);
++  if (auto evaluator = populateTraitBindingEvaluator(traitSymbol, traitDeclOp))
++    traitSignature = cast<FnTypeGeneratorType>(
++        evaluator->replace(static_cast<Type>(traitSignature)));
+ 
+   auto bindings = ParamBindings::getForDeclaredType(
+       emitter.getDeclScope(), structSelfType, &syntheticNode);
+@@ -4021,13 +4092,19 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
+                                                      structDecl.getLoc())))
+       continue;
+ 
++    bool traitCollectsFixedArguments =
++        traitSignature.findPackVarArgIndex().has_value() &&
++        !structCallFn.getFuncTypeGenerator().findPackVarArgIndex().has_value();
+     size_t actualExplicit = explicitParamCount(structCallFn);
+-    if (actualExplicit < targetPayloadParams)
+-      continue;
+-    size_t inferredPrefix = leadingInferredParamCount(structCallFn);
+-    size_t actualAuxCount = actualExplicit - targetPayloadParams;
+-    if (actualAuxCount > inferredPrefix)
+-      continue;
++    size_t actualAuxCount = 0;
++    if (!traitCollectsFixedArguments) {
++      if (actualExplicit < targetPayloadParams)
++        continue;
++      size_t inferredPrefix = leadingInferredParamCount(structCallFn);
++      actualAuxCount = actualExplicit - targetPayloadParams;
++      if (actualAuxCount > inferredPrefix)
++        continue;
++    }
+ 
+     SmallVector<TypedAttr> captureBindings = getCaptureBindings(structDeclOp);
+     if (actualAuxCount > captureBindings.size())
+@@ -4041,12 +4118,13 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
+     AdapteeParts adapteeParts;
+     if (canFunctionSignatureMatchTraitParamInf(structCallFn, traitSignature,
+                                                auxCtx, shared, adapteeParts)) {
+-      if (rebind)
++      if (rebind) {
+         buildCallAdaptorAndAddWitness(
+             structDeclOp, structDecl, traitDeclOp, callFunction,
+             buildSymbolWithBindings(structCallFn, structDeclOp.getInputParams(),
+                                     adapteeParts.fnLevelBindings),
+             adapteeParts);
++      }
+ 
+       return success();
+     }
+@@ -4058,12 +4136,26 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
+ LogicalResult
+ ClosureEmitter::augmentWitnessTablesToConformTo(ASTType structType,
+                                                 ASTDecl *traitDecl) {
+-  return checkStructCompatibility(structType, traitDecl, true);
++  auto traitOp = cast<TraitDeclOp>(traitDecl->getIfOperation());
++  return augmentWitnessTablesToConformTo(
++      structType, TraitSymbolAttr::get(getFullyResolvedSymbolRef(traitOp)));
++}
++
++LogicalResult ClosureEmitter::augmentWitnessTablesToConformTo(
++    ASTType structType, TraitSymbolAttr traitSymbol) {
++  return checkStructCompatibility(structType, traitSymbol, true);
+ }
+ 
+ LogicalResult ClosureEmitter::isCompatibleWith(ASTType structType,
+                                                ASTDecl *traitDecl) {
+-  return checkStructCompatibility(structType, traitDecl, false);
++  auto traitOp = cast<TraitDeclOp>(traitDecl->getIfOperation());
++  return isCompatibleWith(
++      structType, TraitSymbolAttr::get(getFullyResolvedSymbolRef(traitOp)));
++}
++
++LogicalResult ClosureEmitter::isCompatibleWith(ASTType structType,
++                                               TraitSymbolAttr traitSymbol) {
++  return checkStructCompatibility(structType, traitSymbol, false);
+ }
+ 
+ LogicalResult ClosureEmitter::isTraitCompatibleWith(ASTType sourceTraitType,
+diff --git a/KGEN/lib/MojoParser/ClosureEmitter.h b/KGEN/lib/MojoParser/ClosureEmitter.h
+index c92f1e4a832737009a1ade1093a41b951a5cf810..c267bf084827417d920078051cbf3ac29e27bed3 100644
+--- a/KGEN/lib/MojoParser/ClosureEmitter.h
++++ b/KGEN/lib/MojoParser/ClosureEmitter.h
+@@ -184,7 +184,8 @@ private:
+ 
+   /// Underlying implementation of `augmentWitnessTablesToConformTo` and
+   /// `isCompatibleWith`.
+-  LogicalResult checkStructCompatibility(ASTType structType, ASTDecl *traitDecl,
++  LogicalResult checkStructCompatibility(ASTType structType,
++                                         TraitSymbolAttr traitSymbol,
+                                          bool emitRebind);
+ 
+   /// Synthesize an adaptor function that rebinds the closure wrapper's
+@@ -206,6 +207,8 @@ public:
+   /// argument names.
+   LogicalResult augmentWitnessTablesToConformTo(ASTType structType,
+                                                 ASTDecl *closureTrait);
++  LogicalResult augmentWitnessTablesToConformTo(
++      ASTType structType, TraitSymbolAttr closureTrait);
+ 
+   /// Extend a source closure value/type constrained by one closure trait to a
+   /// structurally compatible target closure trait, without changing the
+@@ -216,6 +219,8 @@ public:
+   /// Checks if the wrapper struct type conforms to a trait that is compatible
+   /// with the desired trait.
+   LogicalResult isCompatibleWith(ASTType structType, ASTDecl *traitDecl);
++  LogicalResult isCompatibleWith(ASTType structType,
++                                 TraitSymbolAttr traitSymbol);
+ 
+   /// Returns true if sourceTraitType can conform to targetTrait.
+   LogicalResult isTraitCompatibleWith(ASTType sourceTraitType,
+diff --git a/KGEN/lib/MojoParser/ExprConversions.cpp b/KGEN/lib/MojoParser/ExprConversions.cpp
+index 3ab5dc7f5d4cbb781a558ab152ede3de7147f0f7..ec13e83bbeb8ea4bb49a39480a627f152e8ebbf7 100644
+--- a/KGEN/lib/MojoParser/ExprConversions.cpp
++++ b/KGEN/lib/MojoParser/ExprConversions.cpp
+@@ -1715,8 +1715,8 @@ PValue IREmitter::bindNonStructTypeToTrait(ASTExprAnd<CValue> value,
+ // Generalized Implicit Conversions
+ //===----------------------------------------------------------------------===//
+ 
+-static ASTDecl *getClosureTraitDecl(SharedState &shared,
+-                                    const TraitType &traitTy) {
++static std::optional<TraitSymbolAttr>
++getClosureTraitSymbol(SharedState &shared, const TraitType &traitTy) {
+   for (const auto &symbol : traitTy.getSymbols()) {
+     auto &symbolDecl =
+         shared.declResolver->getDeclForTypeSymbol(symbol.getSymbol());
+@@ -1726,10 +1726,10 @@ static ASTDecl *getClosureTraitDecl(SharedState &shared,
+     if (auto traitDeclOp =
+             dyn_cast_if_present<TraitDeclOp>(symbolDecl.getIfOperation());
+         traitDeclOp && traitDeclOp.getDefinesClosure())
+-      return &symbolDecl;
++      return symbol;
+   }
+ 
+-  return nullptr;
++  return std::nullopt;
+ }
+ 
+ // Returns the upcastability verdict (`yes`/`no`/`unknown`) for converting a
+@@ -1757,14 +1757,14 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
+   auto canFnLiteralUpCastToTrait = [&](TypedAttr fnPValue,
+                                        AnyTraitType anyTrait) {
+     TraitType closureTrait = anyTrait.getTraitType();
+-    if (auto traitDecl = getClosureTraitDecl(shared, closureTrait)) {
++    if (auto traitSymbol = getClosureTraitSymbol(shared, closureTrait)) {
+       Type concreteWrapperType =
+           shared.getClosureEmitter().getConcreteClosureWrapperTypeForFnSymbol(
+               *declScope, loc, fnPValue);
+       if (!concreteWrapperType)
+         return false;
+       return succeeded(shared.getClosureEmitter().isCompatibleWith(
+-          concreteWrapperType, traitDecl));
++          concreteWrapperType, *traitSymbol));
+     }
+     // Maintain convertibility as a MLIR type ...
+     return checkMLIRTypeConformance(shared, loc, closureTrait);
+@@ -1794,7 +1794,7 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
+             // If this is a struct, check whether we can do lazy conformance.
+             if (sugarIsa<StructMetaType>(fromType) &&
+                 failed(shared.closureEmitter->isCompatibleWith(fromType,
+-                                                               &symbolDecl)))
++                                                               symbol)))
+               return TriState::no();
+ 
+             if (sugarIsa<TraitType>(fromType) &&
+@@ -1863,7 +1863,7 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
+                 dyn_cast_if_present<TraitDeclOp>(symbolDecl.getIfOperation());
+             traitDeclOp && traitDeclOp.getDefinesClosure()) {
+           if (succeeded(shared.closureEmitter->isCompatibleWith(concreteType,
+-                                                                &symbolDecl)) ||
++                                                                symbol)) ||
+               succeeded(shared.closureEmitter->isTraitCompatibleWith(
+                   concreteType, traitDeclOp, declScope)))
+             return TriState::yes();
+@@ -2103,14 +2103,14 @@ IREmitter::emitTypeValueUpCastToTrait(ASTExprAnd<CValue> valueExpr,
+   auto emitFnLiteralUpCastToTrait = [&](TypedAttr fnPValue,
+                                         AnyTraitType anyTrait) {
+     TraitType closureTrait = anyTrait.getTraitType();
+-    if (auto traitDecl = getClosureTraitDecl(shared, closureTrait)) {
++    if (auto traitSymbol = getClosureTraitSymbol(shared, closureTrait)) {
+       ASTType structWrapper =
+           shared.getClosureEmitter().getConcreteClosureWrapperTypeForFnSymbol(
+               declScope, valueExpr.expr->getLoc(), fnPValue);
+       if (!structWrapper)
+         return PValue();
+       (void)shared.getClosureEmitter().augmentWitnessTablesToConformTo(
+-          structWrapper, traitDecl);
++          structWrapper, *traitSymbol);
+       return emitMetaTypeToTraitConversion(
+           {PValue(structWrapper), valueExpr.expr}, closureTrait);
+     }
+@@ -2137,7 +2137,7 @@ IREmitter::emitTypeValueUpCastToTrait(ASTExprAnd<CValue> valueExpr,
+                 dyn_cast_if_present<TraitDeclOp>(symbolDecl.getIfOperation());
+             traitDeclOp && traitDeclOp.getDefinesClosure()) {
+           if (failed(shared.getClosureEmitter().augmentWitnessTablesToConformTo(
+-                  fromType, &symbolDecl))) {
++                  fromType, symbol))) {
+             // Augmentation failed. Only treat this as fatal for a *genuine*
+             // trait-to-trait extension: a trait-view source that does not
+             // already expose this (structurally compatible but distinct) trait
+@@ -2202,7 +2202,7 @@ IREmitter::emitTypeValueUpCastToTrait(ASTExprAnd<CValue> valueExpr,
+                 dyn_cast_if_present<TraitDeclOp>(symbolDecl.getIfOperation());
+             traitDeclOp && traitDeclOp.getDefinesClosure()) {
+           (void)shared.getClosureEmitter().augmentWitnessTablesToConformTo(
+-              concreteType, &symbolDecl);
++              concreteType, symbol);
+         }
+       }
+ 
+diff --git a/KGEN/lib/MojoParser/SpecializeInf.cpp b/KGEN/lib/MojoParser/SpecializeInf.cpp
+index 64589cef2fe4bd40c3ea986b9e5788c5d72070f5..8fd024ae701aa90618db99bb21a12805be2a8c39 100644
+--- a/KGEN/lib/MojoParser/SpecializeInf.cpp
++++ b/KGEN/lib/MojoParser/SpecializeInf.cpp
+@@ -162,6 +162,108 @@ FailureOr<SmallVector<TypedAttr>>
+ SpecializeInf::inferSpecialization(FnTypeGeneratorType target,
+                                    FnTypeGeneratorType actualSig,
+                                    ArrayRef<ParamDeclAttr> actualParams) {
++  // A fixed-arity function can satisfy a closure trait whose trailing
++  // argument is a heterogeneous pack.  ParamMatcher already implements the
++  // required fixed-to-pack matching, including inference of the backing
++  // TypeList.  Use that path before the one-to-one convention walk below,
++  // which deliberately assumes equal arity.
++  if (std::optional<size_t> packIndex = target.findPackVarArgIndex();
++      packIndex && !actualSig.findPackVarArgIndex()) {
++    if (actualSig.getFnEffects() != target.getFnEffects())
++      return mlir::failure();
++
++    ParamRefRemapper remapper(actualParams);
++    ParamMatcher matcher(expr, *this, /*allowImplicitConversions=*/false);
++
++    Type actualResult = remapper.replace(actualSig.getUserResultType());
++    Type targetResult = evaluator.getReboundType(target.getUserResultType());
++    if (failed(matcher.matchTypes(actualResult, targetResult)))
++      return mlir::failure();
++
++    size_t actualUserArgumentCount =
++        actualSig.getNumArguments() - actualSig.hasMemoryOnlyResult() -
++        actualSig.isThrows();
++    size_t targetUserArgumentCount =
++        target.getNumArguments() - target.hasMemoryOnlyResult() -
++        target.isThrows();
++    if (*packIndex + 1 != targetUserArgumentCount ||
++        actualUserArgumentCount < *packIndex)
++      return mlir::failure();
++
++    PogListAttr targetPogs = target.getArgListAttrs();
++    for (size_t argumentIndex = 0; argumentIndex < *packIndex;
++         ++argumentIndex) {
++      if (failed(matchArgument(
++              remapper.replace(actualSig.getArgument(argumentIndex)),
++              actualSig.getArgConvention(argumentIndex), argumentIndex,
++              evaluator.getReboundType(target.getArgument(argumentIndex)),
++              target.getArgConvention(argumentIndex), targetPogs)))
++        return mlir::failure();
++    }
++
++    ASTType packType = RefType::stripRefConvention(
++        evaluator.getReboundType(target.getArgument(*packIndex)),
++        target.getArgConvention(*packIndex));
++    ASTType::VariadicPackInfo packInfo = packType.getVariadicPackInfo();
++    RefPackType refPackType = packType.getVariadicPackInfo(getShared());
++    ASTType elementTrait = refPackType.getParamListElementType();
++    auto packOrigin =
++        AnyOriginAttr::get(target.getContext(), /*isMut=*/false);
++    if (failed(matcher.matchParams(packOrigin, refPackType.getOrigin())))
++      return mlir::failure();
++    ArrayRef<TypedAttr> packBindings = packType.getParamBindings();
++    assert(packBindings.size() == 7 && "malformed VariadicPack type");
++    Type originStructType =
++        evaluator.getReboundType(packBindings[2].getType());
++    if (failed(matcher.matchParams(LIT::getEmptyStructValue(originStructType),
++                                   packBindings[2])))
++      return mlir::failure();
++    ArgConvention expectedConvention =
++        target.getVariadicConvention(*packIndex);
++    SmallVector<TypedAttr> elementTypes;
++    IREmitter emitter(getDeclScope(), EC_TypeParamValue);
++    for (size_t argumentIndex = *packIndex;
++         argumentIndex < actualUserArgumentCount; ++argumentIndex) {
++      ArgConvention actualConvention =
++          actualSig.getArgConvention(argumentIndex);
++      if (!checkConventionsConvertible(expectedConvention, actualConvention))
++        return mlir::failure();
++      Type actualType = remapper.replace(actualSig.getArgument(argumentIndex));
++      Type actualValueType = RefType::stripRefConvention(actualType,
++                                                         actualConvention);
++      if (failed(matcher.matchTypes(
++              ASTType(actualValueType).extractMetaType(), elementTrait)))
++        return mlir::failure();
++      PValue converted = emitter.emitPValue(
++          {PValue(actualValueType), expr}, EC_TypeParamValue, elementTrait);
++      if (!converted)
++        return mlir::failure();
++      elementTypes.push_back(converted);
++    }
++
++    auto variadicType =
++        sugarCast<ParamListType>(refPackType.getVariadic().getType());
++    if (failed(matcher.matchParams(
++            ParamListAttr::get(elementTypes, variadicType),
++            refPackType.getVariadic())))
++      return mlir::failure();
++
++    Type typeListType =
++        evaluator.getReboundType(packInfo.typeListStruct.getType());
++    if (failed(matcher.matchParams(LIT::getEmptyStructValue(typeListType),
++                                   packInfo.typeListStruct)))
++      return mlir::failure();
++
++    SmallVector<TypedAttr> specialization;
++    specialization.reserve(evaluator.getIndexBindings().size());
++    for (TypedAttr binding : evaluator.getIndexBindings()) {
++      if (!binding || sugarIsa<UnboundAttr>(binding))
++        return mlir::failure();
++      specialization.push_back(binding);
++    }
++    return specialization;
++  }
++
+   // The target may have a ByRefResult slot that the actual lacks when the
+   // actual returns in-register. Allow that convention size difference.
+   bool targetHasExtraResultSlot =
 diff --git a/KGEN/lib/POPDialect/POPOpsFolders.cpp b/KGEN/lib/POPDialect/POPOpsFolders.cpp
-index 3da76ca2c1..ba6a31bd9d 100644
+index 3da76ca2c10e59b5787f9e83285b01ed90462285..ba6a31bd9d9b6dbdba7c547aa7bb36dcaf473718 100644
 --- a/KGEN/lib/POPDialect/POPOpsFolders.cpp
 +++ b/KGEN/lib/POPDialect/POPOpsFolders.cpp
 @@ -1472,6 +1472,14 @@ LogicalResult StoreOp::canonicalize(StoreOp op, PatternRewriter &b) {
@@ -4289,7 +5296,7 @@ index 3da76ca2c1..ba6a31bd9d 100644
    if (auto cst = dyn_cast_or_null<KGEN::ParamConstantOp>(
 diff --git a/KGEN/lib/Target/Metal/MetalTraits.cpp b/KGEN/lib/Target/Metal/MetalTraits.cpp
 new file mode 100644
-index 0000000000..0a9817a316
+index 0000000000000000000000000000000000000000..0a9817a3161f32603397380a88856d71b6fdd58b
 --- /dev/null
 +++ b/KGEN/lib/Target/Metal/MetalTraits.cpp
 @@ -0,0 +1,50 @@
@@ -4345,7 +5352,7 @@ index 0000000000..0a9817a316
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Target/Metal/MetalTraits.h b/KGEN/lib/Target/Metal/MetalTraits.h
 new file mode 100644
-index 0000000000..d9806191e9
+index 0000000000000000000000000000000000000000..d9806191e9f26da686b343d12128c1cd72dac3ec
 --- /dev/null
 +++ b/KGEN/lib/Target/Metal/MetalTraits.h
 @@ -0,0 +1,42 @@
@@ -4392,7 +5399,7 @@ index 0000000000..d9806191e9
 +
 +#endif // KGEN_TARGET_METAL_METALTRAITS_H
 diff --git a/KGEN/lib/Transforms/LowerAsyncFunctions.cpp b/KGEN/lib/Transforms/LowerAsyncFunctions.cpp
-index 15efcd2723..d26e818d2c 100644
+index 15efcd2723d7d85739d498aa79939ab71dfbf91b..d26e818d2c0c0ba4117f20934d5c839ab94aaa45 100644
 --- a/KGEN/lib/Transforms/LowerAsyncFunctions.cpp
 +++ b/KGEN/lib/Transforms/LowerAsyncFunctions.cpp
 @@ -1209,8 +1209,36 @@ void LowerAsyncBuildContext::insertFrameLoadsStores(
@@ -4454,7 +5461,7 @@ index 15efcd2723..d26e818d2c 100644
    } else {
      builder.setInsertionPoint(opWithUse);
 diff --git a/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir b/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
-index 223f1008e5..bb5db72192 100644
+index 223f1008e5c24800ab56659c65990ab8a8aa7374..bb5db721922704cf246a48aee78da61cb9700499 100644
 --- a/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
 +++ b/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
 @@ -2,6 +2,16 @@
@@ -4475,7 +5482,7 @@ index 223f1008e5..bb5db72192 100644
  kgen.func @neg() -> (!kgen.simd<2, si8>, !kgen.simd<2, f32>) {
    // CHECK-DAG: <1, -1>
 diff --git a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
-index c95a9bde40..562e4ea3d7 100644
+index c95a9bde40f5ae8d60802c86e03be458aec9c4b7..562e4ea3d70f22429f40f2502c7a30e1b2a29490 100644
 --- a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
 +++ b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
 @@ -15,6 +15,66 @@ kgen.func @masked_load_with_alignment(
@@ -4550,8 +5557,48 @@ index c95a9bde40..562e4ea3d7 100644
  
  }
 -
+diff --git a/KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo b/KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo
+new file mode 100644
+index 0000000000000000000000000000000000000000..445b94505cd1722a5e0d418ebe1e0568af1d024c
+--- /dev/null
++++ b/KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo
+@@ -0,0 +1,34 @@
++# ===----------------------------------------------------------------------=== #
++# Copyright (c) 2026, Modular Inc. All rights reserved.
++#
++# Licensed under the Apache License v2.0 with LLVM Exceptions:
++# https://llvm.org/LICENSE.txt
++# ===----------------------------------------------------------------------=== #
++# RUN: %parse-mojo-isolated %s -o %t.mlir
++# RUN: FileCheck %s < %t.mlir
++
++# A fixed-arity unified closure can satisfy a callable trait whose argument
++# types are expressed as a heterogeneous TypeList pack. The conformance thunk
++# must unpack the trait pack and forward each fixed argument to the closure.
++
++def accept_closure_pack[
++    DeclaredArgTypes: TypeList[Trait=AnyType, ...],
++    //,
++    FuncType: TrivialRegisterPassable
++    & def(*values: *DeclaredArgTypes) -> None,
++    *ActualArgTypes: AnyType,
++](func: FuncType, *args: *ActualArgTypes):
++    pass
++
++
++# CHECK-LABEL: lit.struct.decl @"exercise()::add_bias::__storage"
++# CHECK: sourceName = "__call__$def
++# CHECK: lit.call {{.*}}@"__call__$trait
++# CHECK: kgen.conformance @"def
++def exercise():
++    var bias = Int32(7)
++
++    def add_bias(value: Int32, scale: Float32) {var bias}:
++        _ = bias
++
++    accept_closure_pack(add_bias, Int32(5), Float32(2))
 diff --git a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl b/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
-index 1e3797a730..b28bd1c860 100644
+index 1e3797a730c58267240443a22042020b054a40ec..b28bd1c860708182895fad81768c2b4181a29fe9 100644
 --- a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
 +++ b/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
 @@ -52,6 +52,7 @@ _INCLUDES = [
@@ -4563,10 +5610,18 @@ index 1e3797a730..b28bd1c860 100644
      "System/Library/Frameworks/Security.framework/**",
      "System/Library/Frameworks/SystemConfiguration.framework/**",
 diff --git a/max/mojo/max/gpu/host/_device_context_extras.mojo b/max/mojo/max/gpu/host/_device_context_extras.mojo
-index 0d010d7e4d..90d45c146c 100644
+index 0d010d7e4d9c2273b96aebc320731852b4d13531..8d2c3979ba8e8e1386b60f6c73b430753ab5a90c 100644
 --- a/max/mojo/max/gpu/host/_device_context_extras.mojo
 +++ b/max/mojo/max/gpu/host/_device_context_extras.mojo
-@@ -283,6 +283,9 @@ __extension DeviceExternalFunction:
+@@ -165,6 +165,7 @@ __extension DeviceFunction:
+             target=Self.target,
+             compile_options=Self.compile_options,
+             link_options=Self.link_options,
++            argument_types=Self.declared_arg_types,
+         ]()
+         var debug_level = String(DebugLevel)
+         _checked(
+@@ -283,6 +284,9 @@ __extension DeviceExternalFunction:
                      MutUntrackedOrigin
                  ](),
                  None,
@@ -4577,7 +5632,7 @@ index 0d010d7e4d..90d45c146c 100644
              )
  
 diff --git a/max/mojo/max/gpu/host/_device_context_metal.mojo b/max/mojo/max/gpu/host/_device_context_metal.mojo
-index 103beda300..4791f3f654 100644
+index 103beda3007d647c7c09c7abf3cf06d043bb5e0b..0dc9d4911d42d9a55910de514759f10f9351d489 100644
 --- a/max/mojo/max/gpu/host/_device_context_metal.mojo
 +++ b/max/mojo/max/gpu/host/_device_context_metal.mojo
 @@ -54,7 +54,14 @@ struct MetalEnqueueFunctionArgs:
@@ -4595,7 +5650,7 @@ index 103beda300..4791f3f654 100644
  
  
  struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
-@@ -62,10 +69,39 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
+@@ -62,10 +69,37 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
      trait."""
  
      var _buffers: List[Pointer[_DeviceBufferCpp, MutUntrackedOrigin]]
@@ -4616,44 +5671,43 @@ index 103beda300..4791f3f654 100644
 +        mut self, argument_index: Int, argument_base: MutOpaquePointer[_]
 +    ):
 +        """Begins recording device-pointer fixups for one kernel argument."""
-+        debug_assert(
-+            self._current_argument_index == -1,
-+            "Metal device-type argument encoding must not be nested",
++        assert self._current_argument_index == -1, (
++            "Metal device-type argument encoding must not be nested"
 +        )
-+        debug_assert(argument_index >= 0, "Metal argument index must be valid")
++        assert argument_index >= 0, "Metal argument index must be valid"
 +        self._current_argument_index = Int32(argument_index)
 +        self._current_argument_base_address = Int(argument_base)
 +
 +    def end_argument(mut self):
 +        """Finishes recording device-pointer fixups for one kernel argument."""
-+        debug_assert(
-+            self._current_argument_index >= 0,
-+            "Metal device-type argument encoding was not active",
++        assert self._current_argument_index >= 0, (
++            "Metal device-type argument encoding was not active"
 +        )
 +        self._current_argument_index = -1
 +        self._current_argument_base_address = 0
  
      @staticmethod
      def target() -> _TargetType:
-@@ -88,6 +124,16 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
+@@ -88,13 +122,28 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
              value: The device pointer to encode into `dst`.
              dst: The opaque destination pointer to encode into.
          """
-+        debug_assert(
-+            self._current_argument_index >= 0,
-+            "Metal device pointers must be encoded inside a kernel argument",
++        assert self._current_argument_index >= 0, (
++            "Metal device pointers must be encoded inside a kernel argument"
 +        )
 +        var destination_address = Int(dst)
-+        debug_assert(
-+            destination_address >= self._current_argument_base_address,
-+            "Metal device-pointer fixup precedes its argument storage",
++        assert destination_address >= self._current_argument_base_address, (
++            "Metal device-pointer fixup precedes its argument storage"
 +        )
 +
          value.unsafe_ptr()._to_device_type(self, dst)
  
          var handle = value._buffer_handle()
-@@ -95,6 +141,12 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
-             Bool(handle), "Metal device pointers must have a buffer handle"
+-        debug_assert(
+-            Bool(handle), "Metal device pointers must have a buffer handle"
++        assert Bool(handle), String(
++            t"Metal device pointer in argument {self._current_argument_index}"
++            t" must have a buffer handle"
          )
          self._buffers.append(handle.value().unsafe_bitcast[_DeviceBufferCpp]())
 +        self._device_pointer_argument_indices.append(
@@ -4665,7 +5719,7 @@ index 103beda300..4791f3f654 100644
  
  
  @always_inline
-@@ -183,6 +235,9 @@ def call_with_pack_metal[
+@@ -183,6 +232,9 @@ def call_with_pack_metal[
          dense_args_sizes,
          dense_args_is_device_ptr,
          None,
@@ -4675,19 +5729,96 @@ index 103beda300..4791f3f654 100644
          Int32(0),
      )
  
-@@ -337,7 +392,11 @@ def call_with_pack_checked_metal[
-             # `DeviceBuffer` arg from a nested struct that happens
-             # to contain one or more device pointers.
+@@ -219,6 +271,8 @@ def call_with_pack_metal[
+ @__parameter
+ def call_with_pack_checked_metal[
+     func: Some[TrivialRegisterPassable],
++    has_leading: Bool,
++    LeadingType: DevicePassable,
+     *Ts: DevicePassable,
+     ContextT: _FunctionEnqueuer,
+     num_passed_args: Int,
+@@ -226,6 +280,7 @@ def call_with_pack_checked_metal[
+ ](
+     ctx: ContextT,
+     *args: *Ts,
++    leading: LeadingType,
+     func_handle: _DeviceFunctionPtr[mut=True],
+     device_context: DeviceContext,
+     capture_sizes: Pointer[UInt64, ImmUntrackedOrigin],
+@@ -246,6 +301,9 @@ def call_with_pack_checked_metal[
+ 
+     Parameters:
+         func: The function symbol used by `_checked_call` for error messages.
++        has_leading: Whether a separately supplied leading argument precedes
++            `args` in the kernel ABI.
++        LeadingType: The host type of `leading`.
+         Ts: The host argument types being passed to the kernel.
+         ContextT: The `_FunctionEnqueuer` implementation receiving the launch.
+         num_passed_args: The compile-time count of arguments in `args`.
+@@ -255,6 +313,7 @@ def call_with_pack_checked_metal[
+     Args:
+         ctx: The enqueuer that dispatches the kernel.
+         args: The host-side kernel arguments to encode.
++        leading: The optional separately supplied first kernel argument.
+         func_handle: Handle to the compiled `DeviceFunction` to launch.
+         device_context: The device context backing the function, used for
+             error reporting in `_checked_call`.
+@@ -319,12 +378,14 @@ def call_with_pack_checked_metal[
+     # of device types.
+     var device_type_encoder = MetalDeviceTypeEncoder()
+ 
+-    comptime for i in range(num_passed_args):
++    @__parameter
++    def encode_argument[
++        argument_index: Int, ActualType: DevicePassable
++    ](value: ActualType):
+         # If the arg offset is negative then the corresponding declared
+         # dtype is zero sized and we do not push the argument to the kernel.
+-        var translated_arg_offset = translated_arg_offsets[i]
++        var translated_arg_offset = translated_arg_offsets[argument_index]
+         if translated_arg_offset >= 0:
+-            comptime actual_arg_type = Ts[i]
+             var first_word_addr = Pointer(
+                 to=translated_args_ptr[
+                     unsafe_offset=translated_arg_offset + extra_align
+@@ -333,14 +394,18 @@ def call_with_pack_checked_metal[
+             # Snapshot the encoder's buffer count so we can detect
+             # whether this arg's encoding pushed exactly one device
+             # buffer. Combined with the pointer-sized arg check
+-            # below, this distinguishes a bare `DevicePointer` /
+-            # `DeviceBuffer` arg from a nested struct that happens
+-            # to contain one or more device pointers.
++            # below, this recognizes a bare `DevicePointer` /
++            # `DeviceBuffer` argument and Mojo's ABI-transparent
++            # one-pointer aggregate representation.
              var buffers_before = len(device_type_encoder._buffers)
+-            args[i]._to_device_type(device_type_encoder, first_word_addr)
 +            device_type_encoder.begin_argument(
 +                translated_arg_idx, first_word_addr
 +            )
-             args[i]._to_device_type(device_type_encoder, first_word_addr)
++            value._to_device_type(device_type_encoder, first_word_addr)
 +            device_type_encoder.end_argument()
  
              var arg_size = size_of[
-                 actual_arg_type.device_type,
-@@ -380,7 +439,16 @@ def call_with_pack_checked_metal[
+-                actual_arg_type.device_type,
++                ActualType.device_type,
+                 target=device_type_encoder.target(),
+             ]()
+             dense_args_addrs[unsafe_offset=translated_arg_idx] = first_word_addr
+@@ -353,6 +418,11 @@ def call_with_pack_checked_metal[
+             )
+             translated_arg_idx += 1
+ 
++    comptime if has_leading:
++        encode_argument[argument_index=0](leading)
++    comptime for i in range(Ts.length):
++        encode_argument[argument_index=i + Int(has_leading)](args[i])
++
+     # Drop zero-sized captures so the packed slots (and their sizes) match the
+     # device kernel's declared parameter order; see
+     # `_compact_zero_sized_capture_slots` for why. The surviving capture slots
+@@ -380,7 +450,16 @@ def call_with_pack_checked_metal[
                  MutUntrackedOrigin
              ]()
          ),
@@ -4704,19 +5835,348 @@ index 103beda300..4791f3f654 100644
      )
  
      var metal_args_addrs = unsafe_stack_allocation[
+diff --git a/max/mojo/max/gpu/host/compile.mojo b/max/mojo/max/gpu/host/compile.mojo
+index f349463fbc2cfc3aaedd2cb91365367485e4e0ea..f64813b58c918bd360088b7881d9c24de20885a7 100644
+--- a/max/mojo/max/gpu/host/compile.mojo
++++ b/max/mojo/max/gpu/host/compile.mojo
+@@ -45,12 +45,16 @@ def _compile_code[
+         target
+     ].default_compile_options(),
+     link_options: StaticString = "",
++    argument_types: TypeList[Trait=AnyType, ...] = TypeList.of[
++        Trait=AnyType
++    ](),
+ ]() -> CompiledFunctionInfo[func_type, func, target]:
+     return compile_info[
+         func,
+         emission_kind=emission_kind,
+         compile_options=compile_options,
+         link_options=link_options,
++        argument_types=argument_types,
+         target=target,
+     ]()
+ 
 diff --git a/max/mojo/max/gpu/host/device_context.mojo b/max/mojo/max/gpu/host/device_context.mojo
-index cc56890d81..bf86d2192c 100644
+index cc56890d81b698f0c3a15e114cee9db92f5ba8f5..3c360f02aa1811468b24528fcb34f6b139a606dd 100644
 --- a/max/mojo/max/gpu/host/device_context.mojo
 +++ b/max/mojo/max/gpu/host/device_context.mojo
-@@ -4684,6 +4684,98 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
+@@ -161,6 +161,25 @@ struct _LaunchBits[size: Int, alignment: Int](
+         return "_LaunchBits"
+ 
+ 
++comptime _device_type_for_launch[T: DevicePassable]: AnyType = T.device_type
++
++
++@fieldwise_init
++struct _NoLeadingLaunchArgument(
++    DevicePassable, ImplicitlyCopyable, TrivialRegisterPassable
++):
++    comptime device_type: AnyType = Self
++
++    def _to_device_type(
++        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
++    ):
++        pass
++
++    @staticmethod
++    def get_type_name() -> String:
++        return "_NoLeadingLaunchArgument"
++
++
+ comptime _DeviceContextPtr[
+     mut: Bool,
+     //,
+@@ -1042,9 +1061,10 @@ struct DevicePointer[
+     def _buffer_handle(
+         ref self,
+     ) -> Optional[OpaquePointer[MutUntrackedOrigin]]:
+-        return Optional(
+-            self._buffer[]._handle.value().unsafe_bitcast[NoneType]()
+-        )
++        var handle = self._buffer[]._handle
++        if handle:
++            return Optional(handle.value().unsafe_bitcast[NoneType]())
++        return None
+ 
+     # ===------------------------------------------------------------------=== #
+     # Origin and mutability casts
+@@ -1391,11 +1411,28 @@ struct DevicePointer[
+     # (see `Pointer._is_convertible_to_device_type`), so kernels may still
+     # declare their parameters as `UnsafePointer`.
+     comptime device_type: AnyType = Pointer[
+-        mut=True, Scalar[Self.dtype], AnyOrigin[mut=True]
++        mut=True,
++        Scalar[Self.dtype],
++        AnyOrigin[mut=True],
++        address_space=.GLOBAL,
+     ]
+     """`DevicePointer` is remapped to a device `Pointer` when passed to
+     accelerator devices."""
+ 
++    @staticmethod
++    def _is_convertible_to_device_type[U: AnyType]() -> Bool:
++        # Device pointers denote global device memory. Preserve compatibility
++        # with existing kernel entry points that spell the accepted pointer in
++        # the generic address space; the backend narrows that entry argument to
++        # its global-buffer ABI.
++        comptime GenericDevicePointer = Pointer[
++            mut=True, Scalar[Self.dtype], AnyOrigin[mut=True]
++        ]
++        return (
++            Self.device_type._is_convertible_to_device_type[U]()
++            or GenericDevicePointer._is_convertible_to_device_type[U]()
++        )
++
+     def _to_device_type(
+         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+     ):
+@@ -1458,10 +1495,6 @@ struct DeviceBuffer[dtype: DType](
+     """
+ 
+     # Implementation of `DevicePassable`
+-    # Kernel-entry ABI type. `Pointer` and its `UnsafePointer` alias are one
+-    # representation, and device-argument matching accepts either spelling
+-    # (see `Pointer._is_convertible_to_device_type`), so kernels may still
+-    # declare their parameters as `UnsafePointer`.
+     comptime device_type: AnyType = Pointer[
+         mut=True, Scalar[Self.dtype], AnyOrigin[mut=True]
+     ]
+@@ -3071,6 +3104,7 @@ struct DeviceFunction[
+                 target=Self.target,
+                 compile_options=Self.compile_options,
+                 link_options=Self.link_options,
++                argument_types=Self.declared_arg_types,
+             ]().asm
+ 
+         comptime if Self._ptxas_info_verbose:
+@@ -3134,6 +3168,7 @@ struct DeviceFunction[
+                 target=Self.target,
+                 compile_options=Self.compile_options,
+                 link_options=Self.link_options,
++                argument_types=Self.declared_arg_types,
+             ]().asm
+ 
+             comptime if dump_llvm_val.isa[def() capturing -> Path]():
+@@ -3316,7 +3351,7 @@ struct DeviceFunction[
+     @always_inline
+     @staticmethod
+     def _validate_arguments[
+-        *Ts: DevicePassable,
++        actual_arg_types: TypeList[Trait=DevicePassable, ...],
+         num_args: Int,
+     ]() -> Tuple[Int, Array[Int, num_args]]:
+         comptime declared_num_args = Self.declared_arg_types.length
+@@ -3334,7 +3369,7 @@ struct DeviceFunction[
+ 
+         comptime for i in range(num_args):
+             comptime declared_arg_type = Self.declared_arg_types[i]
+-            comptime actual_arg_type = Ts[i]
++            comptime actual_arg_type = actual_arg_types[i]
+ 
+             def declared_arg_type_name() -> String:
+                 comptime if conforms_to(declared_arg_type, DevicePassable):
+@@ -3404,15 +3439,90 @@ struct DeviceFunction[
+         var attributes: List[LaunchAttribute] = [],
+         var constant_memory: List[ConstantMemoryMapping] = [],
+         location: Optional[SourceLocation] = None,
++    ) raises:
++        self._call_with_pack_checked_impl[has_leading=False](
++            ctx,
++            *args,
++            leading=_NoLeadingLaunchArgument(),
++            grid_dim=grid_dim,
++            block_dim=block_dim,
++            cluster_dim=cluster_dim,
++            shared_mem_bytes=shared_mem_bytes,
++            attributes=attributes^,
++            constant_memory=constant_memory^,
++            location=location,
++        )
++
++    @always_inline
++    @__parameter
++    def _call_with_leading_and_pack_checked[
++        LeadingType: DevicePassable,
++        *Ts: DevicePassable,
++    ](
++        imm self,
++        ctx: Some[_FunctionEnqueuer],
++        *args: *Ts,
++        leading: LeadingType,
++        grid_dim: Dim,
++        block_dim: Dim,
++        cluster_dim: OptionalReg[Dim] = None,
++        shared_mem_bytes: OptionalReg[Int] = None,
++        var attributes: List[LaunchAttribute] = [],
++        var constant_memory: List[ConstantMemoryMapping] = [],
++        location: Optional[SourceLocation] = None,
++    ) raises:
++        self._call_with_pack_checked_impl[has_leading=True](
++            ctx,
++            *args,
++            leading=leading,
++            grid_dim=grid_dim,
++            block_dim=block_dim,
++            cluster_dim=cluster_dim,
++            shared_mem_bytes=shared_mem_bytes,
++            attributes=attributes^,
++            constant_memory=constant_memory^,
++            location=location,
++        )
++
++    @always_inline
++    @__parameter
++    def _call_with_pack_checked_impl[
++        has_leading: Bool,
++        LeadingType: DevicePassable,
++        *Ts: DevicePassable,
++    ](
++        imm self,
++        ctx: Some[_FunctionEnqueuer],
++        *args: *Ts,
++        leading: LeadingType,
++        grid_dim: Dim,
++        block_dim: Dim,
++        cluster_dim: OptionalReg[Dim] = None,
++        shared_mem_bytes: OptionalReg[Int] = None,
++        var attributes: List[LaunchAttribute] = [],
++        var constant_memory: List[ConstantMemoryMapping] = [],
++        location: Optional[SourceLocation] = None,
+     ) raises:
+         # We need to keep track of both the number of arguments pushed by the
+         # caller and the number of translated arguments expected by the kernel.
+-        comptime num_passed_args = Ts.length
++        comptime num_passed_args = Ts.length + Int(has_leading)
++        comptime actual_arg_types = TypeList._concat[
++            Trait=DevicePassable,
++            TypeList.of[
++                Trait=DevicePassable, LeadingType
++            ]().values if has_leading else TypeList.of[
++                Trait=DevicePassable
++            ]().values,
++            TypeList.of[Trait=DevicePassable, *Ts]().values,
++        ]()
+ 
+         # Validate that all actual arguments do remap to the declared device
+         # dtype in the kernel.
+         var validated_args = Self._validate_arguments[
+-            *Ts, num_args=num_passed_args
++            TypeList[
++                Trait=DevicePassable, actual_arg_types.values
++            ](),
++            num_args=num_passed_args,
+         ]()
+         var num_translated_args = validated_args[0]
+         var translated_arg_offsets = validated_args[1].copy()
+@@ -3429,7 +3539,7 @@ struct DeviceFunction[
+             var tmp_args_size = 8  # always reserve 8 extra bytes for alignment.
+ 
+             comptime for i in range(num_passed_args):
+-                comptime actual_arg_type = Ts[i]
++                comptime actual_arg_type = actual_arg_types[i]
+                 tmp_args_size += align_up(
+                     size_of[actual_arg_type.device_type, target=Self.target](),
+                     8,
+@@ -3494,11 +3604,13 @@ struct DeviceFunction[
+         if self._context.api() == "metal":
+             call_with_pack_checked_metal[
+                 Self.func,
++                has_leading=has_leading,
+                 num_passed_args=num_passed_args,
+                 num_captures_static=num_captures_static,
+             ](
+                 ctx,
+                 *args,
++                leading=leading,
+                 func_handle=self._handle,
+                 device_context=self._context,
+                 capture_sizes=self._func_impl.capture_sizes,
+@@ -3530,26 +3642,34 @@ struct DeviceFunction[
+             # encoding of device types.
+             var device_type_encoder = DefaultDeviceTypeEncoder()
+ 
+-            comptime for i in range(num_passed_args):
++            @__parameter
++            def encode_argument[
++                argument_index: Int, ActualType: DevicePassable
++            ](value: ActualType):
+                 # If the arg offset is negative then the corresponding declared
+                 # dtype is zero sized and we do not push the argument to the
+                 # kernel.
+-                var translated_arg_offset = translated_arg_offsets[i]
++                var translated_arg_offset = translated_arg_offsets[
++                    argument_index
++                ]
+                 if translated_arg_offset >= 0:
+                     var first_word_addr = Pointer(
+                         to=translated_args.unsafe_ptr()[
+                             unsafe_offset=translated_arg_offset + extra_align
+                         ]
+                     ).unsafe_bitcast[NoneType]()
+-                    args[i]._to_device_type(
+-                        device_type_encoder, first_word_addr
+-                    )
++                    value._to_device_type(device_type_encoder, first_word_addr)
+ 
+                     dense_args_addrs[
+                         unsafe_offset=translated_arg_idx
+                     ] = first_word_addr.as_unsafe_any_origin()
+                     translated_arg_idx += 1
+ 
++            comptime if has_leading:
++                encode_argument[argument_index=0](leading)
++            comptime for i in range(Ts.length):
++                encode_argument[argument_index=i + Int(has_leading)](args[i])
++
+             # Drop zero-sized captures so the packed slots match the device
+             # kernel's declared parameter order; see
+             # `_compact_zero_sized_capture_slots` for why.
+@@ -4778,31 +4898,10 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
+         )
+ 
+         # The compiled kernel is FuncType.__call__; the launch argument is the
+-        # encoded FuncType.device_type instance. Layout punning is only safe
+-        # while those sizes and alignments coincide on the launch target.
++        # encoded FuncType.device_type instance.  The host and device layouts
++        # may differ when a captured host handle becomes a device pointer, so
++        # the normal DevicePassable encoder must perform the conversion.
+         comptime launch_target = Self.default_device_info.target()
+-        comptime host_size = size_of[FuncType, target=launch_target]()
+-        comptime device_size = size_of[
+-            FuncType.device_type, target=launch_target
+-        ]()
+-        comptime host_align = align_of[FuncType, target=launch_target]()
+-        comptime device_align = align_of[
+-            FuncType.device_type, target=launch_target
+-        ]()
+-        comptime assert host_size == device_size, String(
+-            "capturing enqueue_function requires size_of[FuncType] to match",
+-            " size_of[FuncType.device_type] on the launch target; host=",
+-            host_size,
+-            " device=",
+-            device_size,
+-        )
+-        comptime assert host_align == device_align, String(
+-            "capturing enqueue_function requires align_of[FuncType] to match",
+-            " align_of[FuncType.device_type] on the launch target; host=",
+-            host_align,
+-            " device=",
+-            device_align,
+-        )
+ 
+         var gpu_kernel = DeviceFunction[
+             FuncType.__call__,
+@@ -4828,6 +4927,76 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
              location=location.or_else(call_location()),
          )
  
 +    @always_inline
 +    def enqueue_function[
-+        DeclaredArgType: AnyType,
-+        FuncType: DevicePassable & def(DeclaredArgType) -> None,
-+        ActualArgType: DevicePassable,
++        DeclaredArgTypes: TypeList[Trait=AnyType, ...],
++        //,
++        FuncType: DevicePassable
++        & def(*values: *DeclaredArgTypes) -> None,
++        *ActualArgTypes: DevicePassable,
 +        dump_asm: _DumpPath = False,
 +        dump_llvm: _DumpPath = False,
 +        _dump_sass: _DumpPath = False,
@@ -4724,7 +6184,7 @@ index cc56890d81..bf86d2192c 100644
 +    ](
 +        self,
 +        func: FuncType,
-+        arg: ActualArgType,
++        *args: *ActualArgTypes,
 +        grid_dim: Dim,
 +        block_dim: Dim,
 +        cluster_dim: OptionalReg[Dim] = None,
@@ -4733,18 +6193,13 @@ index cc56890d81..bf86d2192c 100644
 +        var constant_memory: List[ConstantMemoryMapping] = [],
 +        func_attribute: OptionalReg[FuncAttribute] = None,
 +        location: Optional[SourceLocation] = None,
-+    ) raises:
-+        """Compiles and enqueues a value-taking capturing kernel with one
-+        explicit argument.
++    ) raises where ActualArgTypes.length > 0:
++        """Compiles and enqueues a value-taking callable with arguments.
 +
-+        Captured values are encoded as the kernel's first argument, followed
-+        by the ordinary explicit argument. This is the value-taking unified
-+        closure counterpart of the parametric `enqueue_function[func](args)`
-+        overload.
-+
-+        TODO: Generalize this overload to a variadic argument pack once the
-+        function-trait matcher can infer a declared type pack from a unified
-+        closure value.
++        The callable's device representation is prepended to the ordinary
++        explicit argument list. Every explicit argument uses its existing
++        `DevicePassable.device_type`; compiling `FuncType.__call__` against
++        that list performs the normal callable-signature validation.
 +        """
 +        _check_dim["DeviceContext.enqueue_function", "grid_dim"](
 +            grid_dim, location=call_location()
@@ -4754,34 +6209,15 @@ index cc56890d81..bf86d2192c 100644
 +        )
 +
 +        comptime launch_target = Self.default_device_info.target()
-+        comptime host_size = size_of[FuncType, target=launch_target]()
-+        comptime device_size = size_of[
-+            FuncType.device_type, target=launch_target
-+        ]()
-+        comptime host_align = align_of[FuncType, target=launch_target]()
-+        comptime device_align = align_of[
-+            FuncType.device_type, target=launch_target
-+        ]()
-+        comptime assert host_size == device_size, String(
-+            "capturing enqueue_function requires size_of[FuncType] to match",
-+            " size_of[FuncType.device_type] on the launch target; host=",
-+            host_size,
-+            " device=",
-+            device_size,
-+        )
-+        comptime assert host_align == device_align, String(
-+            "capturing enqueue_function requires align_of[FuncType] to match",
-+            " align_of[FuncType.device_type] on the launch target; host=",
-+            host_align,
-+            " device=",
-+            device_align,
-+        )
++        comptime kernel_argument_types = TypeList._concat[
++            Trait=AnyType,
++            TypeList.of[Trait=AnyType, FuncType.device_type]().values,
++            DeclaredArgTypes.values,
++        ]
 +
 +        var gpu_kernel = DeviceFunction[
 +            FuncType.__call__,
-+            TypeList.of[
-+                Trait=AnyType, FuncType.device_type, DeclaredArgType
-+            ](),
++            TypeList[Trait=AnyType, kernel_argument_types.values](),
 +            target=launch_target,
 +            _ptxas_info_verbose=_ptxas_info_verbose,
 +        ](self, func_attribute=func_attribute)
@@ -4791,10 +6227,10 @@ index cc56890d81..bf86d2192c 100644
 +            _dump_sass=_dump_sass,
 +        ]()
 +
-+        gpu_kernel._call_with_pack_checked(
++        gpu_kernel._call_with_leading_and_pack_checked(
 +            self,
-+            func,
-+            arg,
++            *args,
++            leading=func,
 +            grid_dim=grid_dim,
 +            block_dim=block_dim,
 +            cluster_dim=cluster_dim,
@@ -4806,9 +6242,9 @@ index cc56890d81..bf86d2192c 100644
 +
      @always_inline
      def enqueue_function[
-         FuncType: DevicePassable & def() -> None,
+         FuncType: RegisterPassable & def() -> None,
 diff --git a/max/mojo/max/runtime/tracing.mojo b/max/mojo/max/runtime/tracing.mojo
-index 6585ac129a..b44039f100 100644
+index 6585ac129a94ac69292de0b220d087702e08d244..b44039f100589ac0a9e5c6b08505abbeeca3f4bb 100644
 --- a/max/mojo/max/runtime/tracing.mojo
 +++ b/max/mojo/max/runtime/tracing.mojo
 @@ -18,6 +18,7 @@ from std.collections.optional import Optional, OptionalReg
@@ -4857,10 +6293,21 @@ index 6585ac129a..b44039f100 100644
              "KGEN_CompilerRT_TimeTraceProfilerGetCurrentId", Int
          ]()
 diff --git a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo b/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
-index 443bc55bd8..86bf7018ba 100644
+index 443bc55bd8b355ff666f2d2370678f77e8164f42..2f7941fc82f17b3e92d26484b5901f0ddf3339eb 100644
 --- a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
 +++ b/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
-@@ -84,9 +84,13 @@ def test_closure_registers_captured_buffers() raises:
+@@ -37,8 +37,8 @@ from max.gpu.host._device_context_metal import MetalDeviceTypeEncoder
+ # lifetime, and `Pointer._is_convertible_to_device_type` accepts the spelling.
+ @fieldwise_init
+ struct PtrPairDevice(ImplicitlyCopyable, TrivialRegisterPassable):
+-    var first: Pointer[Float32, MutUntrackedOrigin]
+-    var second: Pointer[Float32, MutUntrackedOrigin]
++    var first: Pointer[Float32, MutUntrackedOrigin, address_space=.GLOBAL]
++    var second: Pointer[Float32, MutUntrackedOrigin, address_space=.GLOBAL]
+ 
+ 
+ # A register-passable aggregate holding `DevicePassable` `DevicePointer`
+@@ -84,13 +84,23 @@ def test_closure_registers_captured_buffers() raises:
  
      var storage = alloc[type_of(k)]({count = 1}).unsafe_leak()
      var encoder = MetalDeviceTypeEncoder()
@@ -4874,7 +6321,17 @@ index 443bc55bd8..86bf7018ba 100644
  
      # Both captured pointers route through `encode_device_ptr`, registering
      # their owning buffers' handles — and nothing else.
-@@ -120,9 +124,13 @@ def test_closure_registers_buffers_via_nested_struct() raises:
+     assert_equal(len(encoder._buffers), 2)
++    assert_equal(len(encoder._device_pointer_argument_indices), 2)
++    assert_equal(len(encoder._device_pointer_byte_offsets), 2)
++    assert_equal(encoder._device_pointer_argument_indices[0], 0)
++    assert_equal(encoder._device_pointer_argument_indices[1], 0)
++    assert_equal(encoder._device_pointer_byte_offsets[0], 0)
++    assert_equal(encoder._device_pointer_byte_offsets[1], 8)
+ 
+     var handle_a = a._handle.value()
+     var handle_b = b._handle.value()
+@@ -120,11 +130,21 @@ def test_closure_registers_buffers_via_nested_struct() raises:
  
      var storage = alloc[type_of(k)]({count = 1}).unsafe_leak()
      var encoder = MetalDeviceTypeEncoder()
@@ -4887,9 +6344,17 @@ index 443bc55bd8..86bf7018ba 100644
 +    encoder.end_argument()
  
      assert_equal(len(encoder._buffers), 2)
++    assert_equal(len(encoder._device_pointer_argument_indices), 2)
++    assert_equal(len(encoder._device_pointer_byte_offsets), 2)
++    assert_equal(encoder._device_pointer_argument_indices[0], 0)
++    assert_equal(encoder._device_pointer_argument_indices[1], 0)
++    assert_equal(encoder._device_pointer_byte_offsets[0], 0)
++    assert_equal(encoder._device_pointer_byte_offsets[1], 8)
  
+     var handle_a = a._handle.value()
+     var handle_b = b._handle.value()
 diff --git a/mojo/stdlib/std/compile/compile.mojo b/mojo/stdlib/std/compile/compile.mojo
-index 51520054b5..7b83b9c141 100644
+index 51520054b516d19cf93186168eadc682969e7d21..4e962a37d1087dbce2133cb45f4c1eca56367752 100644
 --- a/mojo/stdlib/std/compile/compile.mojo
 +++ b/mojo/stdlib/std/compile/compile.mojo
 @@ -43,8 +43,6 @@ from std.os import PathLike
@@ -4916,7 +6381,32 @@ index 51520054b5..7b83b9c141 100644
      var module_name: __mlir_type.`!kgen.string`
      var num_captures: __mlir_type.index
      var capture_sizes: Pointer[UInt64, ImmUntrackedOrigin]
-@@ -278,7 +280,7 @@ def compile_info[
+@@ -219,6 +221,9 @@ def compile_info[
+         target
+     ].default_compile_options(),
+     link_options: StaticString = "",
++    argument_types: TypeList[Trait=AnyType, ...] = TypeList.of[
++        Trait=AnyType
++    ](),
+ ]() -> CompiledFunctionInfo[func_type, func, target]:
+     """Compiles a function and returns detailed compilation information.
+ 
+@@ -240,6 +245,8 @@ def compile_info[
+             architecture.
+         compile_options: Additional compiler flags and options as a string.
+         link_options: Additional linking flags and options as a string.
++        argument_types: The declared types of arguments supplied when the
++            compiled function is invoked. Defaults to no arguments.
+ 
+     Returns:
+         A `CompiledFunctionInfo` struct containing:
+@@ -273,12 +280,13 @@ def compile_info[
+         emission_option=_get_kgen_string[compile_options](),
+         emission_link_option=_get_kgen_string[link_options](),
+         func=func,
++        argument_types=argument_types.values,
+         _type=_Info,
+     ]()
  
      return CompiledFunctionInfo[func_type, func, target](
          asm=StaticString(offload.asm),
@@ -4926,7 +6416,7 @@ index 51520054b5..7b83b9c141 100644
          num_captures=Int(SIMDLength(mlir_value=offload.num_captures)),
          capture_sizes=offload.capture_sizes,
 diff --git a/mojo/stdlib/std/ffi/__init__.mojo b/mojo/stdlib/std/ffi/__init__.mojo
-index ed6c8f8515..75be889afa 100644
+index ed6c8f8515f5cf564f169629107c7ea6d5f78d74..75be889afa62c8d4d3461d8a76740855656c5356 100644
 --- a/mojo/stdlib/std/ffi/__init__.mojo
 +++ b/mojo/stdlib/std/ffi/__init__.mojo
 @@ -135,7 +135,7 @@ comptime MAX_PATH = _get_max_path()
@@ -4960,7 +6450,7 @@ index ed6c8f8515..75be889afa 100644
          if not handle:
              var error_message = dlerror()
 diff --git a/mojo/stdlib/std/gpu/host/info.mojo b/mojo/stdlib/std/gpu/host/info.mojo
-index b50f997970..2e65abf39c 100644
+index b50f9979708918e4cdecf692aaec6fe7597d080f..2e65abf39cf4d1039558363a4ed19476642bc9c2 100644
 --- a/mojo/stdlib/std/gpu/host/info.mojo
 +++ b/mojo/stdlib/std/gpu/host/info.mojo
 @@ -271,6 +271,22 @@ def _get_metal_m1_target() -> _TargetType:
@@ -5214,7 +6704,7 @@ index b50f997970..2e65abf39c 100644
      elif target_arch == "cuda":
          return _get_info_from_target[_accelerator_arch()]()
 diff --git a/mojo/stdlib/std/io/file.mojo b/mojo/stdlib/std/io/file.mojo
-index 65235212ef..c05c31ef8b 100644
+index 65235212ef1cdce2a33a194cb5f6b662242c2ed4..c05c31ef8b40c66e27863b1e37f22bc0e7d74e05 100644
 --- a/mojo/stdlib/std/io/file.mojo
 +++ b/mojo/stdlib/std/io/file.mojo
 @@ -55,19 +55,19 @@ comptime O_RDWR = 0x0002
@@ -5242,7 +6732,7 @@ index 65235212ef..c05c31ef8b 100644
  """Close file descriptor on exec."""
  
 diff --git a/mojo/stdlib/std/io/file_descriptor.mojo b/mojo/stdlib/std/io/file_descriptor.mojo
-index 6e39f2d288..ee127fd263 100644
+index 6e39f2d288731b19b25bb74cadabf266d33ed4be..ee127fd263f33e7b8be5ea040609651f56b5a385 100644
 --- a/mojo/stdlib/std/io/file_descriptor.mojo
 +++ b/mojo/stdlib/std/io/file_descriptor.mojo
 @@ -112,7 +112,7 @@ struct FileDescriptor(TrivialRegisterPassable, Writer):
@@ -5259,7 +6749,7 @@ similarity index 100%
 rename from mojo/stdlib/std/os/_macos.mojo
 rename to mojo/stdlib/std/os/_darwin.mojo
 diff --git a/mojo/stdlib/std/os/fstat.mojo b/mojo/stdlib/std/os/fstat.mojo
-index eb6d1b6c8b..e17071a65c 100644
+index eb6d1b6c8bc68c6fcdb71c22a9579d69b6b81594..e17071a65cc9d92763618767b20a925e51cac028 100644
 --- a/mojo/stdlib/std/os/fstat.mojo
 +++ b/mojo/stdlib/std/os/fstat.mojo
 @@ -27,8 +27,8 @@ from ._linux_aarch64 import _lstat as _lstat_linux_arm
@@ -5309,7 +6799,7 @@ index eb6d1b6c8b..e17071a65c 100644
 +    else:
 +        CompilationTarget.unsupported_target_error[operation="std.os.lstat"]()
 diff --git a/mojo/stdlib/std/os/os.mojo b/mojo/stdlib/std/os/os.mojo
-index 434476791a..94f19d825c 100644
+index 434476791a00b266b9abd4e7e824e9a6ce10530c..94f19d825c77714c0270eb655eb360fe99317520 100644
 --- a/mojo/stdlib/std/os/os.mojo
 +++ b/mojo/stdlib/std/os/os.mojo
 @@ -70,7 +70,7 @@ struct _dirent_linux(Copyable):
@@ -5363,7 +6853,7 @@ index 434476791a..94f19d825c 100644
                  )
              )
 diff --git a/mojo/stdlib/std/os/path/path.mojo b/mojo/stdlib/std/os/path/path.mojo
-index 70bd16b198..8951ead3ee 100644
+index 70bd16b198a8404bfe3dd793dc39aff60036c933..8951ead3ee23304f5ae0ce707292bf09e2857863 100644
 --- a/mojo/stdlib/std/os/path/path.mojo
 +++ b/mojo/stdlib/std/os/path/path.mojo
 @@ -32,8 +32,8 @@ from .._linux_aarch64 import _lstat as _lstat_linux_arm
@@ -5420,7 +6910,7 @@ diff --git a/mojo/stdlib/std/pwd/_macos.mojo b/mojo/stdlib/std/pwd/_darwin.mojo
 similarity index 95%
 rename from mojo/stdlib/std/pwd/_macos.mojo
 rename to mojo/stdlib/std/pwd/_darwin.mojo
-index 4401bc80f1..66b78dc960 100644
+index 4401bc80f13ba7c5835517560d5ee5510065d354..66b78dc96000c046a94ae47ca852049f0e45c327 100644
 --- a/mojo/stdlib/std/pwd/_macos.mojo
 +++ b/mojo/stdlib/std/pwd/_darwin.mojo
 @@ -48,7 +48,7 @@ def _build_pw_struct(passwd_ptr: ImmPointer[_C_Passwd, _]) -> Passwd:
@@ -5442,7 +6932,7 @@ index 4401bc80f1..66b78dc960 100644
          "getpwnam", OptionalPointer[_C_Passwd, UntrackedOrigin[mut=True]]
      ](name.as_c_string_slice())
 diff --git a/mojo/stdlib/std/pwd/pwd.mojo b/mojo/stdlib/std/pwd/pwd.mojo
-index 49712397d1..ab5911f495 100644
+index 49712397d170767c44e75a08d790f1a71c2f5097..ab5911f495c68cb88998086a84619559773c0e70 100644
 --- a/mojo/stdlib/std/pwd/pwd.mojo
 +++ b/mojo/stdlib/std/pwd/pwd.mojo
 @@ -18,7 +18,7 @@ user ID or username, returning structured account information including home
@@ -5503,7 +6993,7 @@ index 49712397d1..ab5911f495 100644
 +    else:
 +        CompilationTarget.unsupported_target_error[operation="std.pwd.getpwnam"]()
 diff --git a/mojo/stdlib/std/python/_cpython.mojo b/mojo/stdlib/std/python/_cpython.mojo
-index 4c2c76da9b..9efb01bd2a 100644
+index 4c2c76da9ba0b8185dcd18512ce09d48e7595407..9efb01bd2ab2c3d30ddc0d73108c1f97972cc641 100644
 --- a/mojo/stdlib/std/python/_cpython.mojo
 +++ b/mojo/stdlib/std/python/_cpython.mojo
 @@ -27,6 +27,7 @@ from std.os import abort, getenv, setenv
@@ -5527,7 +7017,7 @@ index 4c2c76da9b..9efb01bd2a 100644
          var file_dir = dirname(argv()[0])
          if Path(file_dir).is_dir() or file_dir == "":
 diff --git a/mojo/stdlib/std/subprocess/subprocess.mojo b/mojo/stdlib/std/subprocess/subprocess.mojo
-index 4c456ce352..0b6bf414a0 100644
+index 4c456ce35250246308627e45216a6a1d3417b789..0b6bf414a0abfd25458e3b9a211378cd48f5015d 100644
 --- a/mojo/stdlib/std/subprocess/subprocess.mojo
 +++ b/mojo/stdlib/std/subprocess/subprocess.mojo
 @@ -107,5 +107,10 @@ def run(cmd: String) raises -> String:
@@ -5542,7 +7032,7 @@ index 4c456ce352..0b6bf414a0 100644
      var hdl = _POpenHandle(cmd)
      return hdl.read()
 diff --git a/mojo/stdlib/std/sys/_libc_errno.mojo b/mojo/stdlib/std/sys/_libc_errno.mojo
-index 80f7faad24..6eeb0b7ac8 100644
+index 80f7faad24d071b64f9fcff8f5e35bbb889e1a0f..6eeb0b7ac87537f7db04a1c15ba9fe5aa077678b 100644
 --- a/mojo/stdlib/std/sys/_libc_errno.mojo
 +++ b/mojo/stdlib/std/sys/_libc_errno.mojo
 @@ -18,7 +18,7 @@ from std.sys.info import CompilationTarget, platform_map
@@ -5858,7 +7348,7 @@ index 80f7faad24..6eeb0b7ac8 100644
              self.value
          )
 diff --git a/mojo/stdlib/std/sys/info.mojo b/mojo/stdlib/std/sys/info.mojo
-index 132e3af2f2..faa9e6da8d 100644
+index 132e3af2f21a2d42a3611c9a4d53ff45fcecaa28..faa9e6da8d4de079b32eb9e608f7b8ec1d4e6f8a 100644
 --- a/mojo/stdlib/std/sys/info.mojo
 +++ b/mojo/stdlib/std/sys/info.mojo
 @@ -189,6 +189,26 @@ struct CompilationTarget[value: _TargetType = _current_target()](
@@ -5980,7 +7470,7 @@ index 132e3af2f2..faa9e6da8d 100644
      return is_apple_gpu() and CompilationTarget._is_arch[subarch]()
  
 diff --git a/mojo/stdlib/std/time/time.mojo b/mojo/stdlib/std/time/time.mojo
-index dcb8370f58..d7c3bb3264 100644
+index dcb8370f589a0013079c1cea76b3d912df4404f4..d7c3bb3264ec315189d0ed062633576461f16afc 100644
 --- a/mojo/stdlib/std/time/time.mojo
 +++ b/mojo/stdlib/std/time/time.mojo
 @@ -62,8 +62,12 @@ struct _CTimeSpec(Defaultable, TrivialRegisterPassable, Writable):
@@ -6012,7 +7502,7 @@ index dcb8370f58..d7c3bb3264 100644
  
  @always_inline
 diff --git a/mojo/stdlib/test/compile/test_compile.mojo b/mojo/stdlib/test/compile/test_compile.mojo
-index f4a5466ab9..fce78cfb8e 100644
+index f4a5466ab921136489b0f65d8aaf45f29504d240..fce78cfb8e835c24543c673c45441c59fe381867 100644
 --- a/mojo/stdlib/test/compile/test_compile.mojo
 +++ b/mojo/stdlib/test/compile/test_compile.mojo
 @@ -17,6 +17,10 @@ from std.testing import TestSuite

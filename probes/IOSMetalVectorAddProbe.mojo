@@ -1,9 +1,11 @@
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.collections import List
 from std.gpu import global_idx, thread_idx
 from std.memory import unsafe_stack_allocation
 from std.runtime import initialize_runtime
+from std.sys import get_defined_bool
 
-from max.gpu.host import DeviceContext, LaunchAttribute
+from max.gpu.host import DeviceContext, DevicePointer, LaunchAttribute
 from max.gpu.host.launch_attribute import (
     LaunchAttributeID,
     LaunchAttributeValue,
@@ -14,6 +16,61 @@ from max.gpu.sync import barrier
 
 comptime FEATURE_MATRIX_ELEMENT_COUNT = 64
 comptime FEATURE_MATRIX_WIDTH = 8
+comptime DUMP_METAL_ARGUMENT_LLVM = get_defined_bool[
+    "MOJO_IOS_DUMP_METAL_ARGUMENT_LLVM", False
+]()
+
+
+@fieldwise_init
+struct MetalPointerPairDevice(ImplicitlyCopyable, TrivialRegisterPassable):
+    var scratch: Pointer[
+        Float32, MutUntrackedOrigin, address_space=.GLOBAL
+    ]
+    var output: Pointer[
+        Float32, MutUntrackedOrigin, address_space=.GLOBAL
+    ]
+
+
+@fieldwise_init
+struct MetalPointerPair[
+    scratch_origin: Origin[mut=True],
+    output_origin: Origin[mut=True],
+](
+    DevicePassable, ImplicitlyCopyable, TrivialRegisterPassable
+):
+    var scratch: DevicePointer[.float32, Self.scratch_origin]
+    var output: DevicePointer[.float32, Self.output_origin]
+
+    comptime device_type: AnyType = MetalPointerPairDevice
+
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
+        encoder.encode_fields[Self.device_type](self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return "MetalPointerPair"
+
+
+@fieldwise_init
+struct MetalArgumentConfig(
+    DevicePassable, ImplicitlyCopyable, TrivialRegisterPassable
+):
+    var tag: UInt8
+    var adjustment: Float32
+    var width: Int32
+
+    comptime device_type: AnyType = Self
+
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
+        encoder.encode_fields[Self.device_type](self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return "MetalArgumentConfig"
 
 
 def _vector_add_kernel(
@@ -89,7 +146,9 @@ def _vector_add_on_metal(
 
     context.enqueue_copy(left_buffer, left.as_imm())
     context.enqueue_copy(right_buffer, right.as_imm())
-    context.enqueue_function[_vector_add_kernel](
+    context.enqueue_function[
+        _vector_add_kernel, dump_llvm=DUMP_METAL_ARGUMENT_LLVM
+    ](
         left_buffer,
         right_buffer,
         output_buffer,
@@ -107,6 +166,9 @@ def _run_metal_feature_matrix(
     var output_buffer = context.enqueue_create_buffer[DType.float32](
         FEATURE_MATRIX_ELEMENT_COUNT
     )
+    var scratch_buffer = context.enqueue_create_buffer[DType.float32](
+        FEATURE_MATRIX_ELEMENT_COUNT + 1
+    )
 
     # Use the value-taking unified-closure overload. This encodes the ordinary
     # scalar captures as the closure value and the output buffer as its normal
@@ -114,30 +176,86 @@ def _run_metal_feature_matrix(
     var scale = Float32(2)
     var bias = Float32(3)
     var width = Int32(FEATURE_MATRIX_WIDTH)
-
+    var captured_lanes = SIMD[DType.float32, 4](0)
+    var captured_config = MetalArgumentConfig(UInt8(0), Float32(0), width)
     def captured_affine_kernel(
-        output_pointer: Pointer[Float32, MutAnyOrigin],
+        pointers: MetalPointerPairDevice,
+        repeated_input_a: Pointer[mut=False, Float32, ImmutAnyOrigin],
+        repeated_input_b: Pointer[mut=False, Float32, ImmutAnyOrigin],
+        explicit_scale: Float32,
+        explicit_lanes: SIMD[DType.float32, 4],
+        explicit_config: MetalArgumentConfig,
     ) {
-        var scale, var bias, var width
+        var scale,
+        var bias,
+        var width,
+        var captured_lanes,
+        var captured_config,
     }:
         var x = global_idx.x
         var y = global_idx.y
         var element_index = y * Int(width) + x
-        output_pointer[unsafe_offset=element_index] = (
-            Float32(element_index) * scale + bias
+        var lane = element_index % 4
+        var value = (
+            (Float32(element_index) * scale + bias) * explicit_scale
+            + explicit_lanes[lane]
+            + captured_lanes[lane]
+            + explicit_config.adjustment
+            + captured_config.adjustment
+            + Float32(explicit_config.tag)
+            + Float32(captured_config.tag)
         )
+        pointers.output[unsafe_offset=element_index] = (
+            value
+            + repeated_input_a[unsafe_offset=element_index]
+            + repeated_input_b[unsafe_offset=element_index]
+        )
+        pointers.scratch[unsafe_offset=element_index] = value
 
-    context.enqueue_function(
+    var repeated_input_buffer = context.enqueue_create_buffer[DType.float32](
+        FEATURE_MATRIX_ELEMENT_COUNT
+    )
+    var nested_result_buffer = context.enqueue_create_buffer[DType.float32](
+        FEATURE_MATRIX_ELEMENT_COUNT
+    )
+    context.enqueue_copy(repeated_input_buffer, output.as_imm())
+    var scratch_base = scratch_buffer.device_ptr()
+    scratch_base += 1
+    var nested_result_pointer = nested_result_buffer.device_ptr()
+    var repeated_input_a = repeated_input_buffer.device_ptr().as_imm()
+    var repeated_input_b = repeated_input_buffer.device_ptr().as_imm()
+    var pointers = MetalPointerPair(scratch_base, nested_result_pointer)
+    var explicit_lanes = SIMD[DType.float32, 4](0)
+    var explicit_config = MetalArgumentConfig(
+        UInt8(0), Float32(0), Int32(FEATURE_MATRIX_WIDTH)
+    )
+
+    context.enqueue_function[dump_llvm=DUMP_METAL_ARGUMENT_LLVM](
         captured_affine_kernel,
-        output_buffer,
+        pointers,
+        repeated_input_a,
+        repeated_input_b,
+        Float32(1),
+        explicit_lanes,
+        explicit_config,
         grid_dim=(2, 2),
         block_dim=(4, 4),
+    )
+    context.enqueue_function[_vector_add_kernel](
+        nested_result_buffer,
+        repeated_input_buffer,
+        output_buffer,
+        grid_dim=FEATURE_MATRIX_ELEMENT_COUNT,
+        block_dim=1,
     )
 
     # A genuinely three-dimensional launch proves all X/Y/Z index families and
     # all launch dimensions.  The explicit scalar is a separate constant-buffer
     # argument rather than part of the closure environment above.
-    context.enqueue_function[_three_dimensional_add_kernel](
+    context.enqueue_function[
+        _three_dimensional_add_kernel,
+        dump_llvm=DUMP_METAL_ARGUMENT_LLVM,
+    ](
         output_buffer,
         Float32(5),
         grid_dim=(2, 2, 2),

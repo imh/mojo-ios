@@ -67,6 +67,10 @@ compile_mojo_probe() {
   local target_triple="$1"
   local target_arch="$2"
   local output_path="$3"
+  local argument_dump_value=false
+  if [[ -n "${MOJO_IOS_METAL_ARGUMENT_IR_OUTPUT:-}" ]]; then
+    argument_dump_value=true
+  fi
   "${compiler_command[@]}" build "${probe_path}" \
     -I "${stdlib_path}" \
     -I "${max_path}" \
@@ -75,6 +79,7 @@ compile_mojo_probe() {
     --target-cpu "${target_arch}" \
     --target-accelerator "${target_arch}" \
     --optimization-level 3 \
+    -DMOJO_IOS_DUMP_METAL_ARGUMENT_LLVM="${argument_dump_value}" \
     -o "${output_path}"
   local metal_library_count
   metal_library_count="$(
@@ -207,6 +212,12 @@ xcrun --sdk macosx clang -target arm64-apple-macosx15.0 \
   "${output_root}/MetalHostVectorAddSmoke.o" \
   -framework Foundation -framework Metal \
   -o "${output_root}/MetalHostVectorAddSmoke"
-"${output_root}/MetalHostVectorAddSmoke"
+if [[ -n "${MOJO_IOS_METAL_ARGUMENT_IR_OUTPUT:-}" ]]; then
+  "${output_root}/MetalHostVectorAddSmoke" \
+    >"${MOJO_IOS_METAL_ARGUMENT_IR_OUTPUT}"
+  cat "${MOJO_IOS_METAL_ARGUMENT_IR_OUTPUT}"
+else
+  "${output_root}/MetalHostVectorAddSmoke"
+fi
 
-echo "verified all M1-M5 Metal target triples plus the useful Mojo Metal MVP on iOS linkage, iPad Simulator, and macOS GPU execution"
+echo "verified the heterogeneous Mojo Metal argument and useful-MVP matrix on iOS linkage, ARM64 Simulator, and macOS GPU execution"

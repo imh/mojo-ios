@@ -2,11 +2,11 @@
 
 This is the canonical implementation plan for making ordinary ahead-of-time
 Mojo libraries usable from Swift in App Store-distributed iOS and iPadOS apps.
-It defines the destination, the gap taxonomy, the evidence model, and the order
-of work. The GitHub task-list hierarchy rooted at
+It defines the destination, gap taxonomy, and evidence model. The GitHub
+task-list hierarchy rooted at
 [CAPABILITY_LEDGER.md](CAPABILITY_LEDGER.md) is the canonical current-status
 inventory. [ROADMAP.md](ROADMAP.md) is the shorter execution view of the
-milestones in this document.
+milestones and current enablement-first work sequence.
 
 ## Objective
 
@@ -104,6 +104,16 @@ Simulator, and physical-iPad lifecycle gates. Cross-version runtime composition
 and the broader production Swift ABI remain open. Shipped runtime archives
 exclude test-only AsyncRT controls, while instrumented host and sanitizer
 products remain separate.
+
+Unchecked work is classified as actionable **enablement**, expected-to-pass
+**verification**, or **blocked** on a genuinely external unavailable
+prerequisite. General upstream architecture work explicitly owned by this
+project is enablement, not blocked. Regressions and
+actionable enablement outrank broad verification regardless of milestone
+number. Verification required to complete an enablement change remains part of
+that change's correctness gate. The current ordered queue is maintained in
+[ROADMAP.md](ROADMAP.md); milestone and workstream numbers below describe
+dependency groups and exit criteria, not scheduling priority.
 
 ## Gap workstreams
 
@@ -211,8 +221,6 @@ I/O API.
 
 Advance one explicit operation family at a time:
 
-- general variadic unified-closure argument inference;
-- complete constant and buffer layouts;
 - textures and samplers;
 - atomics, barriers, simdgroups, and memory-order semantics;
 - Metal-native launch controls with named rejection of CUDA-only attributes;
@@ -362,7 +370,9 @@ release must still rerun the gates against its exact production tuple.
 
 - Establish the upstream language conformance corpus.
 - Complete CompilerRT/AsyncRT ABI census and link closure.
-- Fill generic compiler, Darwin stdlib, and Apple runtime gaps.
+- Verify remaining portable families through normal paths and reclassify only
+  observed failures as generic compiler, Darwin stdlib, or Apple runtime
+  enablement.
 - Add multiple-library, lifecycle, O0/O3, ASan, and TSan gates.
 
 Exit: every portable CPU language/runtime family is either proved in every base
@@ -381,8 +391,7 @@ conventions.
 
 ### M4: general Metal backend
 
-- Complete argument inference, resources, synchronization, launch controls, and
-  O0/debug semantics.
+- Complete resources, synchronization, launch controls, and O0/debug semantics.
 - Add tensor, TensorOps, and quantized operation families.
 - Prove the A-series iPhone and M-series iPad lanes.
 
@@ -400,9 +409,10 @@ fallback and with placement claims limited to observable evidence.
 
 ### M6: remaining general async
 
-- Adopt public task construction, cancellation, async I/O, and GPU-await as
-  upstream semantics become available.
-- Implement only their normal lowering and AsyncRT operations.
+- Define and contribute public task construction, cancellation, async I/O, and
+  GPU-await as general upstream semantics.
+- Implement their normal lowering and AsyncRT operations, including the Apple
+  path, without an iOS-specific substitute.
 
 Exit: every public upstream async capability is classified and the supported
 subset passes lifetime, cancellation, error, and race gates.
@@ -432,7 +442,10 @@ The broad project objective is complete only when:
 8. the complete source delta remains represented by an upstream-shaped,
    continuously rebased patch series.
 
-The next implementation milestone is **M2**, CPU compiler and runtime closure.
-M0 and M1 are complete. No additional isolated accelerator feature should be
-promoted to supported unless those foundations describe and release-gate it
-accurately.
+The next implementation work is the known missing **M4 Metal backend** surface,
+starting with textures and samplers now that general argument inference and
+value/buffer layouts pass their dedicated gate. M2's remaining portable CPU
+and closure families are verification debt and do not outrank that actionable
+enablement. M0 and M1 remain the tracking and release foundations; no
+accelerator feature is promoted unless those foundations describe and
+release-gate it accurately.

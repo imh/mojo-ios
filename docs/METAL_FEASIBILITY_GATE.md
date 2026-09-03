@@ -18,9 +18,15 @@ normal offload interfaces and the standard AsyncRT C ABI.
 - Apple AIR targets are registered as peer offload targets.
 - Standard X/Y/Z GPU index builtins lower to explicit AIR intrinsics and then
   the corresponding AIR kernel arguments.
-- Pointer-buffer, scalar, and aggregate arguments receive explicit AIR address
-  spaces and metadata. Captured scalar closures use the ordinary value-taking
-  `enqueue_function` path.
+- The existing offload representation carries every declared argument type
+  through `compile_offload` and `kgen.offload.pointee_types`; AIR buffer element
+  types no longer depend on inspecting incidental LLVM loads and stores.
+- Pointer-buffer, scalar, SIMD, padded aggregate, and nested device-pointer
+  arguments receive explicit AIR address spaces, sizes, alignments, and access
+  metadata. `DevicePointer.device_type` denotes standard global device memory.
+- Fixed-arity unified closures satisfy the existing heterogeneous TypeList-pack
+  callable trait, so captured closures and explicit arguments use the ordinary
+  value-taking `enqueue_function` path without another overload or ABI.
 - Static shared allocations and dynamic `external_memory` lower to Metal
   threadgroup storage.
 - Legalized modules are written as LLVM 17 bitcode.
@@ -58,17 +64,24 @@ owned errors; they never fall back to CPU.
 
 ## Useful-MVP boundary
 
-The gated slice now includes explicit and captured scalars, X/Y/Z indexing,
-three-dimensional launches, several kernels in one Mojo library, and both
-static and dynamic threadgroup memory. Launch attributes remain CUDA-shaped in
-the upstream API: Metal accepts `IGNORE` and returns a named error for every
-concrete CUDA-only attribute. It never silently ignores one.
+The gated slice now includes heterogeneous variadic argument packs; explicit
+and captured scalar, SIMD, and padded-struct values; multiple and repeated
+buffers; offset and nested global `DevicePointer` values; X/Y/Z indexing;
+three-dimensional launches; several kernels in one Mojo library; and both
+static and dynamic threadgroup memory. Host encoding, runtime fixups, AIR
+layout metadata, and numerical results are checked together. Launch attributes
+remain CUDA-shaped in the upstream API: Metal accepts `IGNORE` and returns a
+named error for every concrete CUDA-only attribute. It never silently ignores
+one.
 
-Still outside this boundary are textures/samplers and other unlisted resource
-classes, target-specific launch controls with no Metal semantic mapping,
-general variadic unified-closure argument inference, and a distinct AIR O0
-pipeline. These must gain an explicit lowering or remain an explicit failure;
-there is no CPU fallback.
+Ordinary runtime `Tuple` is not yet an accepted launch value because upstream
+`Tuple` does not conform to `DevicePassable`; the compiler reports that normal
+trait failure on host and iOS. A raw generic pointer nested inside a constant
+argument is also rejected by name: nested device pointers must denote standard
+`AddressSpace.GLOBAL` memory. Still outside this boundary are textures/samplers
+and other unlisted resource classes, target-specific launch controls with no
+Metal semantic mapping, and a distinct AIR O0 pipeline. These must gain an
+explicit lowering or remain an explicit failure; there is no CPU fallback.
 
 ## Evidence and remaining gate
 
@@ -78,12 +91,21 @@ With `MOJO_IOS_METAL_SIMULATOR_ID` set to a booted arm64 simulator,
 - Apple's Metal compiler accepts the generated AIR;
 - the arm64 iOS Mojo object contains `MTLB` data;
 - the iOS probe fully links with no unresolved AsyncRT symbols;
-- the arm64 iOS Simulator and Mac GPU execute explicit/captured scalars, 3D
-  dispatch, multi-kernel composition, and static/dynamic threadgroup memory;
+- the arm64 iOS Simulator and Mac GPU execute the heterogeneous argument and
+  capture matrix, nested pointer fixups, 3D dispatch, multi-kernel composition,
+  and static/dynamic threadgroup memory;
 - both also prove that a CUDA-only cooperative launch attribute returns the
   exact named error before dispatch;
 - the signed device smoke app executes the same complete matrix on a physical
-  M1 iPad Pro GPU through `scripts/test-metal-device.sh`.
+  M1 iPad Pro GPU through `scripts/run-device-app.sh`, emits the full
+  `metal=useful-mvp` completion marker, and exits successfully.
+
+`scripts/test-metal-argument-lowering.sh` additionally inspects emitted AIR
+LLVM and proves global nested-pointer fields, constant sizes and alignments,
+read/write access metadata, and the named host/iOS rejection boundaries. The
+generic fixed-closure-to-pack adaptor has a parser regression in
+`KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo`; the Metal
+encoder independently checks nested buffer registration and byte offsets.
 
 This completes the useful Metal MVP. It is not a general production iOS Metal
 support claim: add remaining resource classes and GPU operations one explicit

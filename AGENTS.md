@@ -38,8 +38,10 @@ changing any shared tool or its routing instructions.
 - Fix generic lowering when the failure is generic; otherwise fill the normal
   target/backend/runtime extension point already used by peer targets.
 - Do not invent a compiler abstraction solely for this project. If the normal
-  upstream extension point does not exist, record an upstream blocker and stop
-  at an explicit `NotImplemented` boundary.
+  upstream extension point does not exist, implement the required
+  target-neutral upstream architecture when it is in project scope, or record
+  a genuinely external blocker and stop at an explicit `NotImplemented`
+  boundary.
 - Prefer compile-time failure to runtime failure, and runtime failure to silent
   fallback. Never silently substitute CPU, serial, Metal, Core AI, or another
   backend for an unsupported operation.
@@ -67,7 +69,28 @@ Use only this terse tracker form:
 
 - `[x]` means the item's declared scope is complete. Its description must say
   whether the result is supported or deliberately rejected.
-- `[ ]` means the item's declared scope is not complete.
+- `[ ]` means the item's declared scope is not complete. It does not mean the
+  capability is known broken, unsupported, or expected to require code changes.
+- Describe an untested ordinary surface as verification pending, with unchanged
+  normal lowering as the expected outcome. Call it an implementation gap only
+  after evidence identifies a concrete missing lowering, runtime operation, or
+  target extension point.
+- Keep incomplete work in three explicit classes:
+  - **Enablement** is a reproduced failure or source-confirmed missing normal
+    path with actionable implementation or upstream architecture work. A
+    missing general upstream extension point or public contract is enablement
+    when this project has explicitly taken responsibility for designing and
+    contributing it; upstream ownership does not make work blocked.
+  - **Verification** is an unproved surface expected to work through existing
+    normal paths. It does not outrank known enablement work.
+  - **Blocked** is a confirmed gap that cannot presently advance because an
+    external prerequisite is unavailable and outside this project's chosen
+    implementation scope. Record the unblock condition; do not use `Blocked`
+    merely because correct work belongs upstream or requires parent work.
+- Separate these classes with tracker headings or unambiguous descriptions.
+  Within an unchecked branch, order actionable enablement before verification
+  and blocked work. When verification exposes a real failure, reclassify that
+  scope as enablement before expanding or fixing it.
 - Description text describes the capability and its current boundary. It must
   not use decomposition state as a substitute for a real description.
 - Decomposition is optional structure, not a status or disposition. Add nested
@@ -125,6 +148,12 @@ Before completing tracker-related work, verify:
 5. unsupported target-known behavior has a named normal failure and no
    fallback; and
 6. documentation changes do not contradict current gates or artifacts.
+
+Select work in this order: regressions in proved behavior, actionable
+enablement, verification narrowly required by that enablement, then broad
+verification. Never select blocked work until its recorded prerequisite changes.
+Milestone numbering groups dependencies and exit gates; it does not override
+this enablement-first priority.
 
 Run `./scripts/verify-tracker-structure.sh` after every tracker or tracker-link
 change. The repository-managed pre-commit hook runs the same verifier against

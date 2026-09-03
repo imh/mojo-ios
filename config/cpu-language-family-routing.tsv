@@ -1,0 +1,15 @@
+family	representative_paths	route	boundary
+core-control-flow	KGEN/test/mojo-parser/statements,KGEN/test/mojo-integration/for_range.mojo,KGEN/test/mojo-integration/mojo_recursion.mojo	M2-portable-corpus	Runtime branching, loops, early return, and recursion
+aggregate-values	KGEN/test/mojo-parser/exprs/tuple_exprs.mojo,KGEN/test/mojo-integration/alias_unpack.mojo	M2-portable-corpus	Tuples, unpacking, conditional values, and aggregate returns
+runtime-variadics	mojo/stdlib/test/builtin/test_variadic.mojo,KGEN/test/mojo-integration/runtime_variadic_pack_construction.mojo	M2-portable-corpus	Standard runtime variadic construction, iteration, and forwarding
+callable-values	KGEN/test/mojo-integration/function_ptr.mojo,KGEN/test/mojo-integration/function_overloads.mojo,KGEN/test/mojo-integration/function_thunks.mojo	M2-portable-corpus	Overloads, thin function values, indirect calls, and generic thunks
+aggregate-calling-conventions	KGEN/test/mojo-integration/conditional_register_passable_lowering.mojo,KGEN/test/mojo-integration/conditional_rp_move_behavior.mojo,KGEN/test/mojo-integration/extern-c-abi	M2-portable-corpus	Register-passable and memory-only arguments and results
+ownership-generics-traits-errors	KGEN/test/mojo-parser/ownership,KGEN/test/mojo-integration/error_handling.mojo,mojo/stdlib/test/traits	M2-portable-corpus	Portable value ownership, specialization, dispatch, and error propagation
+unified-closures	KGEN/test/mojo-parser/closures,KGEN/test/mojo-integration/closures.mojo	M2-closure-corpus	Standard, callback, and offload closure families
+compile-time-and-reflection	KGEN/test/mojo-integration/comptime_tuples_e2e.mojo,mojo/stdlib/test/reflection	M2-portable-corpus	Materialized compile-time behavior and runtime reflection surfaces
+memory-and-pointers	mojo/stdlib/test/memory	M2-portable-corpus	Allocation, pointer, ownership, initialization, and bounds semantics
+portable-collections-and-iteration	mojo/stdlib/test/collections,mojo/stdlib/test/iter,mojo/stdlib/test/itertools	M2-portable-corpus	Target-independent container and iterator semantics
+target-sensitive-standard-library	mojo/stdlib/test/io,mojo/stdlib/test/os,mojo/stdlib/test/pathlib,mojo/stdlib/test/subprocess,mojo/stdlib/test/time	M3-stdlib-native	Darwin APIs, sandbox behavior, availability, and native dependencies
+async-and-concurrency	mojo/stdlib/test/runtime,max/mojo/test	M6-async	Public tasks, cancellation, async I/O, accelerator await, and remaining concurrency contracts
+accelerators-and-graphs	mojo/stdlib/test/gpu,max	M4-M5-accelerators	Programmable Metal and standard MAX graph backend coverage
+host-tools-and-dynamic-environments	KGEN/test/mojo-tool,KGEN/test/mojo-jupyter,mojo/python	outside-shipped-AOT	Compiler, REPL, notebook, Python, and JIT host behavior is not shipped application code

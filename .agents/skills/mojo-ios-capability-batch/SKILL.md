@@ -22,8 +22,23 @@ Mojo API, compiler abstraction, runtime ABI, or fallback.
 
 ## Define a bounded batch
 
-Unless the user selects another scope, choose the first unfinished capability
-in the earliest actionable milestone. State:
+Unless the user selects another scope, choose work in this order:
+
+1. a regression in already proved behavior;
+2. a reproduced or source-confirmed **enablement** gap with actionable normal
+   implementation or upstream architecture work;
+3. verification narrowly required to complete that enablement; then
+4. broad **verification** expected to pass unchanged.
+
+Never classify work as **blocked** only because the correction belongs upstream
+or must add a general upstream contract or extension point that this project
+has explicitly taken into scope. Reserve blocked for a prerequisite outside
+the project's chosen implementation scope that cannot presently be advanced.
+Do not let milestone numbering or an unchecked verification row outrank
+actionable enablement. If verification discovers a concrete failure,
+reclassify that scope as enablement before expanding the fix.
+
+For the selected batch, state:
 
 - the ordinary upstream Mojo/MAX surface being tested;
 - its normal compiler, library, runtime, and backend path;
@@ -44,8 +59,10 @@ Do not use elapsed-time estimates as the batch definition.
 - Fix a target-independent defect generically and add a non-iOS regression.
 - Fill an existing Darwin, CompilerRT, AsyncRT, MAX, or accelerator extension
   point when the defect is target-specific.
-- If upstream has no appropriate extension point, record a precise blocker and
-  stop at an explicit unsupported boundary.
+- If upstream has no appropriate extension point, either implement a genuinely
+  general upstream-shaped extension when that architecture work is in scope,
+  or record a precise external blocker and stop at an explicit unsupported
+  boundary. Never add a project-only parallel abstraction.
 - Prefer a named compile-time failure. Use an owned runtime error only when the
   support decision is inherently dynamic. Never accept an unresolved symbol
   or silent fallback as a disposition.

@@ -2,6 +2,12 @@
 
 Parent: [capability tracker](../CAPABILITY_LEDGER.md)
 
+The current shipped slice passes its named gates. Unchecked work here is
+verification or external acceptance, not a known runtime/compiler enablement
+gap.
+
+## Verification and external acceptance
+
 - [ ] **AOT content audit**: Scan the complete archive for Mojo source/packages, compiler/JIT components, executable downloads, Python machinery, and undeclared accelerator artifacts.
   - [x] **Current XCFramework inventory**: Every shipped file has a deterministic path, type, mode, size, and SHA-256 record. [gate](../../scripts/test-distribution-audit.sh)
   - [x] **Static archive members**: Every `.a` member has a hash; every Mach-O member records architecture, build version, load commands, dependencies, and symbols.
@@ -15,7 +21,10 @@ Parent: [capability tracker](../CAPABILITY_LEDGER.md)
 - [x] **Licenses, SBOM, and provenance**: The accepted M1 package emits project and upstream licenses, an SPDX dependency inventory, exact toolchain provenance, deterministic payload evidence, and artifact hashes. [tracker](distribution-provenance.md)
 - [x] **Xcode validation**: The privacy-packaged stable CPU/Metal reference app builds, executes on the physical iPad, exports with Apple Distribution signing, and passes server validation for this exact archive. [tracker](distribution-validation.md)
 - [ ] **Stable TestFlight acceptance**: Record App Store Connect acceptance separately from local validation.
-- [ ] **Core AI preview submission**: Toolchain-gated; beta evidence may not be promoted to stable release support.
 - [ ] **Reference App Review**: Retain acceptance evidence without implying approval of every consumer application.
+
+## Blocked
+
+- [ ] **Core AI preview submission**: Toolchain-gated; beta evidence may not be promoted to stable release support.
 
 See the [distribution evidence ladder](../APP_STORE_DISTRIBUTION_GATE.md).

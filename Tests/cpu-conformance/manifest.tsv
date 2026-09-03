@@ -13,3 +13,8 @@ bit-intrinsics	BitIntrinsics.mojo	mojo_ios_conformance_bit_intrinsics	mojo/stdli
 strict-math	StrictMath.mojo	mojo_ios_conformance_strict_math	mojo/stdlib/test/math/test_math.mojo	42	tolerance+classification+ir
 vectorized-memory	VectorizedMemory.mojo	mojo_ios_conformance_vectorized_memory	mojo/stdlib/test/algorithm/test_vectorize.mojo	42	exact+asan+ir
 optimization-semantics	OptimizationSemantics.mojo	mojo_ios_conformance_optimization_semantics	mojo/stdlib/test/builtin/test_simd_fastmath.mojo	42	exact+ir
+control-flow	ControlFlow.mojo	mojo_ios_conformance_control_flow	KGEN/test/mojo-integration/mojo_recursion.mojo	42	exact+ir
+aggregate-values	AggregateValues.mojo	mojo_ios_conformance_aggregate_values	KGEN/test/mojo-parser/exprs/tuple_exprs.mojo	42	exact+ir
+variadic-packs	VariadicPacks.mojo	mojo_ios_conformance_variadic_packs	mojo/stdlib/test/builtin/test_variadic.mojo	42	exact+ir
+indirect-calls	IndirectCalls.mojo	mojo_ios_conformance_indirect_calls	KGEN/test/mojo-integration/function_ptr.mojo	42	exact+ir
+aggregate-calling-conventions	AggregateCallingConventions.mojo	mojo_ios_conformance_aggregate_calling_conventions	KGEN/test/mojo-integration/conditional_register_passable_lowering.mojo	42	exact+ir
