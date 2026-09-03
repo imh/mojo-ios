@@ -228,7 +228,6 @@ concurrency operations reachable by an AOT library.
 Advance one explicit operation family at a time:
 
 - atomics, barriers, simdgroups, and memory-order semantics;
-- a valid AIR O0/debug pipeline;
 - current Metal/AIR target registration;
 - Metal lowering for existing pinned public tensor and TensorOps operations;
 - Metal lowering for existing pinned public quantized operations and their
@@ -398,7 +397,7 @@ conventions.
 
 ### M4: general Metal backend
 
-- Complete existing atomics, synchronization, current-target, and O0/debug semantics.
+- Complete existing atomics, synchronization, and current-target semantics.
 - Implement Metal lowering for existing pinned public tensor, TensorOps, and
   quantized operation families.
 - Prove the A-series iPhone and M-series iPad lanes.

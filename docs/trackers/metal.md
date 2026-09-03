@@ -18,8 +18,7 @@ Mac, Simulator, physical-device, negative-diagnostic, and no-fallback gates for
 every increment.
 
 - [x] **General argument inference**: Fixed-arity unified closures infer through the normal heterogeneous pack trait; scalar, SIMD, padded struct, repeated/multiple buffer, offset, and nested global-pointer layouts pass Mac, Simulator, and physical-iPad gates. Runtime `Tuple` and nested generic pointers are deliberately rejected by name. [evidence](../METAL_FEASIBILITY_GATE.md)
-- [x] **O0 and line-table debug**: True O0 uses only required AIR legalization, preserves unrelated helpers, packages inspectable line tables, and passes Mac, both Simulator classes, and physical-iPad execution without substituting an optimized pipeline. [evidence](../METAL_O0_DEBUG_GATE.md)
-- [ ] **Full debug**: Enablement — Full-debug AIR currently crashes Apple `air-lld`; compilation is deliberately rejected by name before Apple tool invocation until full AIR debug metadata is lowered and packaged correctly. [evidence](../METAL_O0_DEBUG_GATE.md)
+- [x] **O0 and debug information**: True O0 uses only required AIR legalization; line tables and full debug retain source information, package as validated metallibs with dSYM companions, and pass O0/O3 execution on Mac, both Simulator classes, and the physical iPad without optimization or debug-mode downgrades. [evidence](../METAL_O0_DEBUG_GATE.md)
 - [ ] **Metal 4 and AIR 2.8**: Metal 4 targets remain unregistered while the backend emits AIR 2.4 metadata.
 - [ ] **Existing tensor and quantized operations**: Metal lowering and availability checks remain incomplete for tensor, TensorOps, and quantized operations already present in the pinned public surface.
 

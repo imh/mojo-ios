@@ -2,6 +2,8 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${project_root}/scripts/lib/apple-toolchain.sh"
+
 device_smoke_build_directory="${project_root}/build/DeviceSmoke"
 enable_metal_smoke="${MOJO_IOS_ENABLE_METAL_SMOKE:-OFF}"
 
@@ -14,6 +16,8 @@ case "${enable_metal_smoke}" in
     exit 2
     ;;
 esac
+
+mojo_ios_select_apple_toolchain
 
 cmake \
   -S "${project_root}/DeviceSmoke" \

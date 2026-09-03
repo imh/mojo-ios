@@ -86,8 +86,8 @@ argument is also rejected by name: nested device pointers must denote standard
 `AddressSpace.GLOBAL` memory. The pinned public Mojo/MAX surface has no general
 texture, sampler, or Metal-native launch-control API, so this project
 deliberately adds none; ordinary image data remains usable through standard
-buffers. Still outside this boundary are full debug, existing public atomics,
-barriers, simdgroups, and tensor operations. They must gain an explicit
+buffers. Still outside this boundary are existing public atomics, barriers,
+simdgroups, and tensor operations. They must gain an explicit
 lowering or remain an explicit failure; there is no CPU fallback.
 
 ## Evidence and remaining gate
@@ -115,9 +115,8 @@ generic fixed-closure-to-pack adaptor has a parser regression in
 encoder independently checks nested buffer registration and byte offsets.
 
 [`METAL_O0_DEBUG_GATE.md`](METAL_O0_DEBUG_GATE.md) proves true O0, O3
-non-regression, line-table AIR and metallib debug companions, both Simulator
-classes, and physical-iPad O0 execution. Full debug is rejected by name before
-Apple tool invocation because the current full-debug AIR crashes `air-lld`.
+non-regression, line-table and full-debug AIR, validated metallibs and dSYM
+companions, both Simulator classes, and physical-iPad execution.
 
 This completes the useful Metal MVP. It is not a general production iOS Metal
 support claim: lower remaining existing pinned public GPU operations one family

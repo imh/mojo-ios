@@ -54,8 +54,8 @@ The canonical status remains in
 
 1. Repair regressions in already proved behavior.
 2. Complete actionable known gaps in the normal
-   [Metal backend](trackers/metal.md), in tracker order: full debug, current
-   Metal/AIR targets, then existing public tensor and quantized operations.
+   [Metal backend](trackers/metal.md), in tracker order: current Metal/AIR
+   targets, then existing public tensor and quantized operations.
 3. Complete the known missing production ownership, error, and composition
    contracts in the [Swift/C ABI](trackers/swift-abi-artifacts.md).
 4. Select and encode the base minimum/latest OS policy in
@@ -230,10 +230,9 @@ its milestone number is lower. Never select blocked work until its recorded
 prerequisite changes, and never weaken architectural invariants to bypass a
 blocker.
 
-The next actionable implementation work is full AIR debug metadata lowering;
-current Metal/AIR target registration follows it. Atomics, barriers, and
-simdgroups are verification work until execution exposes a concrete missing
-normal path.
+The next actionable implementation work is current Metal/AIR target
+registration. Atomics, barriers, and simdgroups are verification work until
+execution exposes a concrete missing normal path.
 The remaining M2 CPU and closure inventory is deliberately parked as
 verification debt, not treated as evidence of missing iOS implementations.
 
