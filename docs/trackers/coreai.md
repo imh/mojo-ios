@@ -16,13 +16,13 @@ Parent: [capability tracker](../CAPABILITY_LEDGER.md)
 
 - [ ] **ANE-preferred evidence retention**: Preserve reproducible physical-device Instruments evidence before making the preferred/eligible placement claim.
 
-## Enablement queue — upstream-shaped MAX backend
+## Enablement queue — internal MAX backend for existing public graphs
 
-- [ ] **General graph-backend extension**: Add a target-neutral, upstream-shaped backend extension to the open MAX graph compiler/driver; it must serve peer backends and must not be a project-only Core AI abstraction. [boundary](../COREAI_MVP_GATE.md)
-- [ ] **Standard MAX graph lowering**: Implement Core AI conversion through that extension with ordinary MAX graph/tensor syntax and semantics; do not register a project graph API or Mojo source special case.
+- [ ] **Internal graph-backend hook**: Expose the smallest target-neutral internal hook needed for the normal MAX graph compiler/driver to lower existing public graph operations; it must not create a project or public Core AI graph API. [boundary](../COREAI_MVP_GATE.md)
+- [ ] **Standard MAX graph lowering**: Implement Core AI conversion through that internal hook with ordinary MAX graph/tensor syntax and semantics; do not register a project graph API or Mojo source special case.
 - [ ] **Preview authoring integration**: Use the proved pinned Xcode 27/Core AI authoring tuple for development while isolating its underscored beta modules behind the normal backend implementation.
 - [ ] **Backend artifact packaging**: Give versioned `.aimodel`/`.aimodelc` resources explicit ownership, selection, and compatibility metadata through the normal package.
-- [ ] **Async caller integration**: Compose standard graph submission/completion with the general async contract and a cooperative Swift async boundary.
+- [ ] **Async caller integration**: Compose standard graph submission/completion with the existing language-async/runtime path and a cooperative Swift async boundary; do not add a Mojo task API.
 - [ ] **Unsupported graph diagnostics**: Reject unsupported operations, dtypes, shapes, layouts, and effects by name during standard backend conversion.
 
 ## Externally gated release claim

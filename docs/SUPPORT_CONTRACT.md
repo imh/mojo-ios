@@ -12,6 +12,10 @@ A library author writes ordinary CPU Mojo, exports a deliberate C ABI, compiles
 ahead of time on macOS, packages a static XCFramework, and calls it from Swift
 on ARM64 iOS/iPadOS devices and simulators.
 
+"Ordinary" means the pinned upstream public Mojo/MAX surface. The project may
+add an Apple backend implementation behind existing generic selection syntax,
+but does not add or publicize Mojo/MAX types, operations, controls, or APIs.
+
 The author follows Mojo’s normal shared-library pattern by calling
 `std.runtime.initialize_runtime()` at exported entry points. No iOS import,
 branch, custom parallel API, or custom runtime initialization function is
@@ -58,21 +62,24 @@ must not be inferred from a nearby item.
 - Odd-width SIMD values are rejected by the pinned upstream power-of-two width
   rule with the same diagnostic on host and iOS; this project does not
   introduce a target-specific vector representation.
-- Stable public task construction, cancellation, async I/O, and GPU-await. The
-  upstream task substrate is currently private and these remaining operations
-  are absent or unfinished generally; there is no iOS-specific substitute or
-  rejection. Destroying an incomplete task asserts instead of detaching it.
+- Stable public task construction, cancellation, async I/O, and GPU-await are
+  absent from the pinned public surface and are not roadmap API work. The
+  existing upstream task substrate remains private; there is no iOS-specific
+  substitute. Destroying an incomplete task asserts instead of detaching it.
 - Production-wide Metal/GPU execution. The useful experimental MVP supports
   scalar captures, 3D dispatch, multi-kernel Mojo libraries, and static/dynamic
-  threadgroup memory on Mac, Simulator, and physical iPad, but unlisted Metal
-  resource classes and operations remain outside the support claim.
+  threadgroup memory on Mac, Simulator, and physical iPad. Textures, samplers,
+  and Metal-native launch controls are absent from the pinned public surface;
+  remaining existing public Metal operations remain outside the support claim.
 - General Core AI graph export, model packaging, and runtime integration. A
   fixed-shape direct-authoring/AOT/public-Swift feasibility slice passes with
   Xcode 27, including physical iPadOS 27 execution, but it is deliberately not
   linked to Mojo. The open-source MAX graph compiler/driver has no backend
-  extension point for Core AI, so this project does not register a source-level
-  Core AI target. Runtime-selected Core AI context creation fails explicitly,
-  and no Core AI resource is part of the supported package.
+  extension point for Core AI, so this project does not yet register Core AI as
+  a value in the existing generic target selector. Completing that backend may
+  not add a new graph API, source operation, or pseudo-context. Runtime-selected
+  Core AI context creation fails explicitly, and no Core AI resource is part of
+  the supported package.
 - ANE-only execution. Core AI can prefer ANE but currently cannot require it or
   report per-operation residency. Private ANE compiler/runtime APIs are not an
   acceptable substitute.

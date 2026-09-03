@@ -18,7 +18,7 @@ The inventory distinguishes:
 - unified-closure families belonging to the separate M2 closure branch;
 - Darwin- and sandbox-sensitive standard-library behavior belonging to M3;
 - programmable accelerator and graph behavior belonging to M4 and M5;
-- remaining public async behavior belonging to M6; and
+- remaining pinned public async/concurrency verification belonging to M6; and
 - compiler, REPL, notebook, Python, and JIT host behavior that is outside the
   shipped AOT application artifact.
 
@@ -109,8 +109,9 @@ The routing inventory is complete at the intended family level, but M2 remains
 open. Pointer and memory semantics, portable collections and iterators,
 materialized compile-time/reflection behavior, and broader unified closures
 still need their own normal-path evidence. Target-sensitive I/O, filesystem,
-process, and time behavior remains M3 work. Accelerator and general async
-surfaces retain their existing later milestone ownership.
+process, and time behavior remains M3 work. Accelerator and pinned public async
+surfaces retain their existing later milestone ownership only where the pinned
+public source exposes them; absent APIs are not future project work.
 
 Run:
 

@@ -19,6 +19,8 @@ Mojo API, compiler abstraction, runtime ABI, or fallback.
 5. Inspect the pinned upstream source and current patch before deciding where
    a missing capability belongs. Do not answer from remembered Mojo, MAX, or
    Apple behavior when the repository or installed toolchain can establish it.
+6. Treat the pinned public Mojo/MAX surface as the product boundary. Do not add
+   or publicize a Mojo/MAX API merely to expose an iOS or Apple capability.
 
 ## Define a bounded batch
 
@@ -31,9 +33,10 @@ Unless the user selects another scope, choose work in this order:
 4. broad **verification** expected to pass unchanged.
 
 Never classify work as **blocked** only because the correction belongs upstream
-or must add a general upstream contract or extension point that this project
-has explicitly taken into scope. Reserve blocked for a prerequisite outside
-the project's chosen implementation scope that cannot presently be advanced.
+or needs an internal general extension point to carry existing public semantics.
+Reserve blocked for a prerequisite outside the project's chosen implementation
+scope that cannot presently be advanced. A capability absent from the pinned
+public surface is deliberately outside scope rather than blocked or enablement.
 Do not let milestone numbering or an unchecked verification row outrank
 actionable enablement. If verification discovers a concrete failure,
 reclassify that scope as enablement before expanding the fix.
@@ -59,10 +62,11 @@ Do not use elapsed-time estimates as the batch definition.
 - Fix a target-independent defect generically and add a non-iOS regression.
 - Fill an existing Darwin, CompilerRT, AsyncRT, MAX, or accelerator extension
   point when the defect is target-specific.
-- If upstream has no appropriate extension point, either implement a genuinely
-  general upstream-shaped extension when that architecture work is in scope,
-  or record a precise external blocker and stop at an explicit unsupported
-  boundary. Never add a project-only parallel abstraction.
+- If an existing public program needs an extension point that upstream lacks,
+  implement the smallest genuinely general internal extension that preserves
+  its current semantics, or record a precise external blocker and stop at an
+  explicit unsupported boundary. Never add a public API or project-only
+  parallel abstraction to manufacture support for an absent surface.
 - Prefer a named compile-time failure. Use an owned runtime error only when the
   support decision is inherently dynamic. Never accept an unresolved symbol
   or silent fallback as a disposition.

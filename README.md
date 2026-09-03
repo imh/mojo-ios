@@ -18,6 +18,13 @@ The ledger is a progressive-disclosure tracker. Every row has only a done/not
 done checkbox, a scoped description, and optional nested items or a linked
 tracker when finer detail is useful.
 
+The pinned upstream public Mojo/MAX surface is the project boundary. This
+project supplies the compiler, target, backend, runtime, ABI, and packaging work
+needed to run that existing surface on iOS; it does not invent or publicize
+Mojo/MAX APIs. Adding an Apple backend value through an existing generic target
+selector is backend support, while adding a new source type, operation, graph
+API, or control is out of scope.
+
 The Xcode 27 preview release-candidate path is documented in
 [docs/RELEASE_PROVENANCE_GATE.md](docs/RELEASE_PROVENANCE_GATE.md). It emits a
 signed XCFramework ZIP, SPDX 2.3 SBOM, the declared Apache 2.0 with LLVM
@@ -74,9 +81,11 @@ Mojo backend. Direct graph authoring, eight iOS AOT specializations, host
 numerical execution, public-Swift device builds, and physical M1 iPad execution
 pass. The probe demonstrates the public Apple toolchain and runtime only; it is
 not shipped in the Mojo XCFramework or Swift package. The project does not
-register `target="coreai"`, a public Core AI device label,
-or a pseudo-context ahead of the generic graph-compiler/driver extension needed
-for a real backend. Runtime-selected Core AI context creation fails explicitly.
+register `target="coreai"`, a public Core AI device label, or a pseudo-context
+ahead of the internal graph-compiler/driver hook needed for a real backend. A
+future `coreai` registration may only be a backend value in the existing
+generic selection mechanism; it may not add a Mojo/MAX graph API.
+Runtime-selected Core AI context creation currently fails explicitly.
 There is no fixed-graph compiler pass, project-specific runtime ABI, or
 CPU/Metal fallback.
 
@@ -91,14 +100,16 @@ The current upstream task construction APIs are private and unfinished even on
 host platforms. This project supports the existing `_asyncrt` task substrate
 without changing its Mojo-facing interface or claiming it as a stable public
 API. Cancellation, async I/O, and GPU-await have no implemented general Mojo
-surface yet; attempts to use them fail during normal source analysis rather
-than at an iOS-specific branch. Destroying an incomplete task is asserted
-instead of silently detaching it.
+surface in the pinned public source and are not API work for this project;
+attempts to use them fail during normal source analysis rather than at an
+iOS-specific branch. Destroying an incomplete task is asserted instead of
+silently detaching it.
 
 Concrete launch attributes in the current upstream API are CUDA-only. Metal
 accepts `IGNORE` and rejects every other identifier by name before dispatch.
-Unimplemented Metal resource classes and operations remain explicit boundaries.
-There is no CPU fallback.
+The pinned public surface has no texture, sampler, or Metal-native launch API,
+so this project adds none. Existing pinned public Metal operations not yet
+lowered remain explicit boundaries. There is no CPU fallback.
 
 Unsupported runtime-selected DeviceContext APIs and attributes return explicit
 owned errors because their support decision is inherently dynamic.

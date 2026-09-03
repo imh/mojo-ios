@@ -29,7 +29,9 @@ a fallback for the other or for CPU lowering.
 
 No milestone may introduce an iOS Mojo import, application source branch,
 custom closure API, serial/CPU fallback, project-specific runtime ABI, private
-ANE interface, or shipped Mojo JIT.
+ANE interface, shipped Mojo JIT, or public Mojo/MAX capability absent from the
+pinned upstream surface. New internal target/backend plumbing is allowed only
+to execute existing public syntax and semantics.
 
 ## Milestone status
 
@@ -40,8 +42,8 @@ ANE interface, or shipped Mojo JIT.
 | M2: CPU compiler and runtime closure | **verification deferred** | Portable CPU language/runtime corpus is proved or explicitly rejected across the base matrix |
 | M3: standard library and production ABI | **mixed enablement and verification** | Complete target-sensitive inventory and production ownership/error/callback contract |
 | M4: general Metal backend | **next actionable enablement** | Declared Metal operation set passes A-series iPhone and M-series iPad release gates |
-| M5: upstream-shaped Core AI backend | **actionable enablement; Apple probe passes** | Contribute a general MAX graph-backend extension, then convert and execute the declared subset through the proved Core AI path |
-| M6: remaining general async | **actionable upstream enablement** | Define and contribute the remaining general async contracts, then race/lifetime-gate their normal Apple implementations |
+| M5: Core AI backend for existing MAX graphs | **actionable enablement; Apple probe passes** | Add the internal MAX backend hook needed by existing public graph operations, then convert and execute the declared subset through the proved Core AI path |
+| M6: pinned public async | **verification deferred** | Existing `async def`/`await` semantics pass; broader pinned public coverage remains to inventory, and absent APIs are not added |
 | M7: upstream and release sustainability | **pending** | Reviewable patch series, compatibility-tuple CI, signed reproducible releases |
 
 ## Enablement-first execution sequence
@@ -52,9 +54,9 @@ The canonical status remains in
 
 1. Repair regressions in already proved behavior.
 2. Complete actionable known gaps in the normal
-   [Metal backend](trackers/metal.md), in tracker order: resources,
-   synchronization and memory semantics, launch controls, O0/debug, current
-   Metal/AIR targets, then tensor and quantized operations.
+   [Metal backend](trackers/metal.md), in tracker order: atomics,
+   synchronization and memory semantics, O0/debug, current Metal/AIR targets,
+   then existing public tensor and quantized operations.
 3. Complete the known missing production ownership, error, and composition
    contracts in the [Swift/C ABI](trackers/swift-abi-artifacts.md).
 4. Select and encode the base minimum/latest OS policy in
@@ -63,22 +65,23 @@ The canonical status remains in
 5. Split and regression-gate the existing source changes, then automate the
    compatibility tuple in
    [upstream sustainability](trackers/upstream-evidence.md).
-6. Implement the upstream-shaped [Core AI backend](trackers/coreai.md): add the
-   general MAX graph-backend extension, Core AI conversion, artifact ownership,
-   diagnostics, and runtime composition against the proved preview tuple.
-7. Implement [remaining general async](trackers/async-concurrency.md) by
-   contributing public task, cancellation, async-I/O, and accelerator-await
-   contracts and then filling their normal generic and Apple runtime paths.
-8. Only after actionable enablement is exhausted or externally blocked, resume broad
+6. Implement the [Core AI backend](trackers/coreai.md): add the internal MAX
+   backend hook needed to lower existing public graph
+   operations, plus Core AI conversion, artifact ownership, diagnostics, and
+   runtime composition against the proved preview tuple.
+7. Only after actionable enablement is exhausted or externally blocked, resume broad
    expected-to-pass verification: remaining
    [portable CPU families](trackers/cpu-portable-remaining.md),
-   [closure families](trackers/cpu-closure-families.md), target-sensitive
-   stdlib/MAX inventories, additional hardware lanes, and distribution stages.
+   [closure families](trackers/cpu-closure-families.md), pinned public
+   [async/concurrency](trackers/async-concurrency.md), target-sensitive stdlib/MAX
+   inventories, additional hardware lanes, and distribution stages.
 
-Core AI graph integration and remaining public async are explicitly in scope.
-Their missing general upstream extension points and contracts are part of the
-implementation, not reasons to wait for someone else. They must be designed as
-general upstream contributions and must not become iOS-only substitutes.
+Core AI graph integration remains in scope only as backend plumbing for
+existing public MAX graph operations and existing device-selection machinery.
+Public task construction, cancellation, async I/O, accelerator await, textures,
+samplers, and Metal-only launch controls are absent from the pinned public
+surface and are not designed by this project. A later upstream rebase that adds
+one reopens its normal iOS implementation and verification work.
 Focused verification that is necessary to complete or prevent regressions in
 an enablement change travels with that change; this policy defers broad
 exploratory verification, not correctness evidence.
@@ -157,29 +160,36 @@ accepted for production submission and its own device/package gates pass.
 
 Advance one explicit operation family at a time:
 
-1. textures and samplers;
-2. atomics, barriers, simdgroups, and memory ordering;
-3. Metal-native launch controls and named CUDA-only rejection;
-4. valid AIR O0/debug lowering;
-5. tensor, TensorOps, and quantized operation families; and
-6. complete resource, synchronization, error, and lifetime behavior.
+1. atomics, barriers, simdgroups, and memory ordering;
+2. valid AIR O0/debug lowering;
+3. current Metal/AIR target registration;
+4. existing public tensor, TensorOps, and quantized operation families; and
+5. complete synchronization, error, and lifetime behavior for that surface.
+
+The pinned public surface has no textures, samplers, or Metal-native launch
+controls. Image data continues through buffers, and concrete CUDA-only launch
+attributes retain their named rejection.
 
 Every increment retains Mac, Simulator, physical-device, multi-kernel,
 negative-diagnostic, and no-fallback gates. A broad iOS/iPadOS claim requires a
 physical A-series iPhone and M-series iPad lane.
 
-## M5: upstream-shaped Core AI backend
+## M5: Core AI backend for existing MAX graphs
 
 Direct Apple graph authoring, AOT specialization, host execution, and signed
 physical iPadOS 27 execution pass. They prove Apple feasibility, not Mojo/MAX
 integration. The former fixed two-matmul compiler pass and private runtime ABI
 were removed: they bypassed the normal MAX graph compiler and could not grow
-into an upstream backend. Standard Core AI lowering now fails explicitly while
-we add a general backend extension to the open-source MAX graph compiler/driver
-and implement Core AI through it.
+into an upstream backend. Standard Core AI lowering now fails explicitly because
+the pinned MAX implementation exposes no internal backend hook. The work is to
+expose the smallest upstream-reviewable internal hook in the normal MAX path and
+implement Core AI through it. The accepted `coreai` spelling is only a new
+backend value in existing generic target selection; this milestone may not add
+a graph type, operation, builder, annotation, or pseudo-context.
 
-1. Add a general upstream-shaped graph-backend extension usable by peer
-   backends, not a project-only Core AI abstraction.
+1. Expose the smallest target-neutral internal graph-backend hook needed to
+   lower existing public MAX graph operations, not a public or project-only
+   Core AI graph abstraction.
 2. Use the pinned preview authoring interface for development and device gates;
    keep production release claims separately gated on Apple's stable public
    interface.
@@ -189,7 +199,8 @@ and implement Core AI through it.
 5. Reject every unrepresentable operation by name at conversion time.
 6. Package versioned `.aimodel`/`.aimodelc` resources with explicit selection
    and ownership.
-7. Define deliberate Metal custom-operation composition without fallback.
+7. Preserve existing standard custom-operation composition when the pinned
+   public surface exposes it; otherwise record it as absent, without fallback.
 8. Expand the passing physical numerical and concurrent gate with device-side
    error and pending-work lifetime cases.
 9. Generate an async Swift adapter that suspends cooperative-executor callers
@@ -200,12 +211,15 @@ The iOS 27 Simulator's lack of Core AI remains an explicit platform gap. ANE
 only selection and per-operation residency remain platform gaps; private
 interfaces are prohibited.
 
-## M6: remaining general async
+## M6: pinned public async
 
-Define and contribute public task construction, cancellation, async I/O,
-GPU-await, and abandoned-task semantics as general upstream Mojo contracts.
-Implement their normal generic lowering and Apple AsyncRT operations with
-lifetime, error, cancellation, and race gates. Do not create an iOS substitute.
+Ordinary public `async def`, `await`, results, errors, suspension, and resumption
+pass through generic coroutine lowering and normal Apple AsyncRT. The pinned
+surface does not publicly expose task construction, cancellation, async I/O, or
+accelerator await, so this project deliberately adds none. Re-evaluate those
+operations only after a pinned upstream revision exposes them publicly. Broader
+existing public stdlib/MAX async and concurrency coverage remains verification,
+not presumed enablement.
 
 ## M7: upstream and release sustainability
 
@@ -227,8 +241,9 @@ its milestone number is lower. Never select blocked work until its recorded
 prerequisite changes, and never weaken architectural invariants to bypass a
 blocker.
 
-The next implementation work is Metal resource-family support, beginning with
-textures and samplers through the existing offload and DeviceContext paths.
+The next implementation work is the existing public Metal synchronization and
+memory surface, beginning with atomics, barriers, and simdgroups through the
+normal offload and DeviceContext paths.
 The remaining M2 CPU and closure inventory is deliberately parked as
 verification debt, not treated as evidence of missing iOS implementations.
 

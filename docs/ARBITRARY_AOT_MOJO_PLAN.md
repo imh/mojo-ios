@@ -28,6 +28,12 @@ interoperability, subprocess creation, arbitrary dynamic loading, and other
 unavailable facilities remain named compile-time failures until an
 upstream-compatible static architecture exists.
 
+The pinned upstream public Mojo/MAX surface is also the scope boundary. This
+project adds target, compiler, backend, and runtime implementation needed to
+execute that surface on iOS; it does not invent or publicize Mojo/MAX APIs for
+capabilities the pinned source cannot express. A later pinned upstream revision
+that adds a public surface reopens its iOS disposition.
+
 App Store compliance is an evidence ladder, not a property inferred from
 successful compilation. The project distinguishes architecture compliance,
 local archive validation, TestFlight acceptance, and actual App Review
@@ -77,6 +83,8 @@ Every milestone preserves these invariants:
    reported as standalone ANE execution.
 7. **Upstream-shaped ownership.** Generic compiler fixes, Darwin target policy,
    Apple runtimes, and Metal/Core AI integration remain separable for review.
+8. **No language expansion.** Internal target/backend extension is allowed to
+   preserve existing public semantics; new public Mojo/MAX contracts are not.
 
 ## Current baseline
 
@@ -107,8 +115,9 @@ products remain separate.
 
 Unchecked work is classified as actionable **enablement**, expected-to-pass
 **verification**, or **blocked** on a genuinely external unavailable
-prerequisite. General upstream architecture work explicitly owned by this
-project is enablement, not blocked. Regressions and
+prerequisite. Internal upstream architecture needed by an existing pinned
+public surface is enablement, not blocked; absent public surfaces are
+deliberately outside scope. Regressions and
 actionable enablement outrank broad verification regardless of milestone
 number. Verification required to complete an enablement change remains part of
 that change's correctness gate. The current ordered queue is maintained in
@@ -212,22 +221,27 @@ Produce a release package, not merely a smoke-test archive:
 ### 6. Async and concurrency
 
 Preserve the implemented generic language async and CPU parallelism routes.
-Track public task construction, cancellation, async I/O, GPU-await, and
-abandoned-task behavior separately. When general upstream semantics exist, add
-their normal lowering and Apple AsyncRT operation; do not create an iOS task or
-I/O API.
+The pinned surface does not publicly expose task construction, cancellation,
+async I/O, GPU-await, or abandoned-task control, so record those absences and
+do not create an iOS or general replacement. Reopen them only after a pinned
+upstream revision exposes public semantics.
 
 ### 7. Metal programmable accelerator coverage
 
 Advance one explicit operation family at a time:
 
-- textures and samplers;
 - atomics, barriers, simdgroups, and memory-order semantics;
-- Metal-native launch controls with named rejection of CUDA-only attributes;
 - a valid AIR O0/debug pipeline;
-- public tensor and TensorOps abstractions;
-- quantized types and availability diagnostics; and
-- complete resource, error, synchronization, and lifetime tests.
+- current Metal/AIR target registration;
+- Metal lowering for existing pinned public tensor and TensorOps operations;
+- Metal lowering for existing pinned public quantized operations and their
+  availability diagnostics; and
+- complete error, synchronization, and lifetime tests for existing resources.
+
+The pinned public surface has no general texture, sampler, or Metal-native
+launch-control API. This project adds none: ordinary image data remains usable
+through buffers, while the existing CUDA-shaped launch surface keeps its named
+Metal rejections.
 
 Every increment retains Mac, Simulator, physical-device, multi-kernel,
 negative-diagnostic, and no-fallback gates. The physical matrix must include an
@@ -243,7 +257,8 @@ The direct graph gate proves feasibility only. A production backend requires:
 - operation-by-operation conversion with dtype, shape, state, dynamic-shape,
   and availability diagnostics;
 - a named conversion failure for every unrepresentable operation;
-- explicit composition with deliberately selected Metal custom operations;
+- preservation of existing standard Metal custom-operation composition where
+  the pinned public surface exposes it, with absence recorded otherwise;
 - versioned `.aimodel` and `.aimodelc` resource selection and ownership;
 - public Swift execution on iOS/iPadOS 27 hardware;
 - numerical, error, concurrency, and lifetime evidence; and
@@ -391,31 +406,38 @@ conventions.
 
 ### M4: general Metal backend
 
-- Complete resources, synchronization, launch controls, and O0/debug semantics.
-- Add tensor, TensorOps, and quantized operation families.
+- Complete existing atomics, synchronization, current-target, and O0/debug semantics.
+- Implement Metal lowering for existing pinned public tensor, TensorOps, and
+  quantized operation families.
 - Prove the A-series iPhone and M-series iPad lanes.
 
 Exit: the declared Metal capability set is broad, operation-indexed, and
 release-gated; unlisted operations fail by name.
 
-### M5: upstream-shaped Core AI backend
+### M5: Core AI backend for existing MAX graphs
 
 - Select the generic graph IR and implement explicit conversion.
 - Add resource/package composition and unrepresentable-operation gates.
 - Execute on iOS/iPadOS 27 hardware and retain Instruments evidence.
 
+`coreai` may be added only as a backend value in the existing generic target
+selection mechanism. This milestone adds no Mojo/MAX graph type, operation,
+builder, annotation, or pseudo-context.
+
 Exit: the declared Core AI graph subset executes through public APIs with no
 fallback and with placement claims limited to observable evidence.
 
-### M6: remaining general async
+### M6: pinned public async
 
-- Define and contribute public task construction, cancellation, async I/O, and
-  GPU-await as general upstream semantics.
-- Implement their normal lowering and AsyncRT operations, including the Apple
-  path, without an iOS-specific substitute.
+- Preserve ordinary `async def`, `await`, results, errors, suspension, and
+  resumption through generic lowering and normal AsyncRT.
+- Inventory and verify any other pinned public stdlib/MAX async and concurrency
+  operations reachable by an AOT library.
+- Record task construction, cancellation, async I/O, and accelerator await as
+  absent from the pinned public surface rather than adding contracts.
 
-Exit: every public upstream async capability is classified and the supported
-subset passes lifetime, cancellation, error, and race gates.
+Exit: every pinned public async capability is classified and the existing
+public subset passes its lifetime and error gates.
 
 ### M7: upstream and release sustainability
 
@@ -443,8 +465,8 @@ The broad project objective is complete only when:
    continuously rebased patch series.
 
 The next implementation work is the known missing **M4 Metal backend** surface,
-starting with textures and samplers now that general argument inference and
-value/buffer layouts pass their dedicated gate. M2's remaining portable CPU
+starting with atomics, barriers, and simdgroups now that general argument
+inference and value/buffer layouts pass their dedicated gate. M2's remaining portable CPU
 and closure families are verification debt and do not outrank that actionable
 enablement. M0 and M1 remain the tracking and release foundations; no
 accelerator feature is promoted unless those foundations describe and

@@ -7,6 +7,13 @@ iOS and iPadOS through their normal compiler, library, runtime, and accelerator
 paths. Application authors must not need an iOS-only Mojo import, source branch,
 closure convention, graph API, runtime initializer, or fallback.
 
+The pinned upstream public Mojo/MAX surface is the product boundary. Do not add
+new public language or library APIs, or promote private APIs to public, in order
+to create iOS work. Internal compiler, backend, and runtime architecture may be
+extended only to carry an existing public program through its normal semantics.
+If the pinned public surface cannot express a capability, record that deliberate
+absence and revisit it only when a later pinned upstream revision exposes it.
+
 Treat an upstream-compatible missing lowering, Darwin implementation, runtime
 operation, target backend operation, or packaging step as the work. Do not make
 an iOS special case look complete by introducing a parallel abstraction.
@@ -37,11 +44,11 @@ changing any shared tool or its routing instructions.
 - Preserve standard Mojo and MAX syntax and semantics.
 - Fix generic lowering when the failure is generic; otherwise fill the normal
   target/backend/runtime extension point already used by peer targets.
-- Do not invent a compiler abstraction solely for this project. If the normal
-  upstream extension point does not exist, implement the required
-  target-neutral upstream architecture when it is in project scope, or record
-  a genuinely external blocker and stop at an explicit `NotImplemented`
-  boundary.
+- Do not invent a compiler abstraction solely for this project. If carrying an
+  existing public Mojo/MAX program requires a missing internal extension point,
+  implement the smallest target-neutral upstream architecture that preserves
+  that program's existing semantics. Do not define a new public Mojo/MAX
+  contract to create work for an otherwise absent capability.
 - Prefer compile-time failure to runtime failure, and runtime failure to silent
   fallback. Never silently substitute CPU, serial, Metal, Core AI, or another
   backend for an unsupported operation.
@@ -77,10 +84,9 @@ Use only this terse tracker form:
   target extension point.
 - Keep incomplete work in three explicit classes:
   - **Enablement** is a reproduced failure or source-confirmed missing normal
-    path with actionable implementation or upstream architecture work. A
-    missing general upstream extension point or public contract is enablement
-    when this project has explicitly taken responsibility for designing and
-    contributing it; upstream ownership does not make work blocked.
+    path for an existing pinned public surface, with actionable implementation
+    or internal upstream architecture work. An absent public Mojo/MAX contract
+    is outside the pinned surface, not an invitation to design one here.
   - **Verification** is an unproved surface expected to work through existing
     normal paths. It does not outrank known enablement work.
   - **Blocked** is a confirmed gap that cannot presently advance because an

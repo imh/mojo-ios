@@ -12,9 +12,11 @@ Swift application       -> public Core AI runtime
 ```
 
 Application Mojo must not import Core AI, branch on iOS, name Apple hardware,
-or call a project API. A future compiler backend must accept only graph-shaped
-programs representable by Core AI and reject every other operation by name at
-conversion time. Selecting Metal is a separate compilation decision, never
+or call a project API. A Core AI backend may consume only existing public MAX
+graph operations representable by Core AI and must reject every other operation
+by name at conversion time. It may add a backend value to existing generic
+selection, but no source type, operation, graph builder, annotation, or
+pseudo-context. Selecting Metal is a separate compilation decision, never
 recovery from failed Core AI conversion.
 
 The compiler and model authoring tools run on macOS. The application ships
@@ -72,10 +74,11 @@ This is not yet a complete Phase 3 verdict:
    `Value` from underscored `coreai._compiler` modules and says their public
    `coreai.authoring` re-export is pending. The probe deliberately isolates
    those imports. They are feasibility evidence, not a stable production API.
-2. The open-source MAX tree does not contain the graph compiler/driver extension
-   required to add a real backend. Standard Core AI lowering is therefore a
-   named compile-time `NotImplemented`; there is no fixed marker, LLVM pattern
-   pass, or project runtime ABI.
+2. The open-source MAX tree does not contain the internal graph compiler/driver
+   hook required to add a real backend for existing public graphs. Standard
+   Core AI lowering is therefore a named compile-time `NotImplemented`; there
+   is no fixed marker, LLVM pattern pass, project runtime ABI, or replacement
+   graph API.
 3. The source asset, compiled specializations, and deterministic manifest are
    build-only probe outputs. They are not preserved in the Swift package or
    presented as compiler output. Release packaging belongs to a future normal

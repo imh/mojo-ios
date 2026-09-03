@@ -46,7 +46,8 @@ The language-async gate is positive, not an iOS exception. Ordinary async,
 await, result, and raised-error probes must lower for device and simulator at
 O0/O3 and import the standard AsyncRT chain ABI. The generic coroutine fixes
 contain no target checks. Cancellation, async I/O, and GPU-await remain absent
-from the general upstream surface and therefore require no iOS policy branch.
+from the pinned public upstream surface, require no iOS policy branch, and are
+not API work for this project.
 
 CPU compilation retains the upstream lowering pipeline. The experimental Metal
 slice adds a peer AIR target backend and explicit AIR legalization passes, plus

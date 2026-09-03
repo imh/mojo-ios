@@ -12,4 +12,4 @@ Parent: [capability tracker](../CAPABILITY_LEDGER.md)
 
 ## Enablement queue
 
-- [ ] **MAX graph and model runtime**: Add a general upstream-shaped backend extension to the open driver, then implement Core AI through it without a project graph API or Mojo source special case.
+- [ ] **MAX graph and model runtime**: Expose the normal internal backend hook needed to lower existing public graph operations, then implement Core AI through it without a new graph API or Mojo source special case.

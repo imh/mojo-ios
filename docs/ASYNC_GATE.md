@@ -80,4 +80,7 @@ make incomplete-task destruction explicit.
 Cancellation, async I/O, and GPU-await are not implemented by the current
 general upstream task surface. They fail during normal name resolution,
 elaboration, or type checking rather than through iOS-specific guards. There is
-no silent detach, CPU fallback, or platform-specific replacement.
+no silent detach, CPU fallback, or platform-specific replacement. Because the
+pinned public surface does not expose these contracts, this project does not
+design them; a later upstream revision must expose them before their iOS path is
+reconsidered.

@@ -78,9 +78,11 @@ Ordinary runtime `Tuple` is not yet an accepted launch value because upstream
 `Tuple` does not conform to `DevicePassable`; the compiler reports that normal
 trait failure on host and iOS. A raw generic pointer nested inside a constant
 argument is also rejected by name: nested device pointers must denote standard
-`AddressSpace.GLOBAL` memory. Still outside this boundary are textures/samplers
-and other unlisted resource classes, target-specific launch controls with no
-Metal semantic mapping, and a distinct AIR O0 pipeline. These must gain an
+`AddressSpace.GLOBAL` memory. The pinned public Mojo/MAX surface has no general
+texture, sampler, or Metal-native launch-control API, so this project
+deliberately adds none; ordinary image data remains usable through standard
+buffers. Still outside this boundary are existing public atomics, barriers,
+simdgroups, tensor operations, and a distinct AIR O0 pipeline. They must gain an
 explicit lowering or remain an explicit failure; there is no CPU fallback.
 
 ## Evidence and remaining gate
@@ -108,6 +110,7 @@ generic fixed-closure-to-pack adaptor has a parser regression in
 encoder independently checks nested buffer registration and byte offsets.
 
 This completes the useful Metal MVP. It is not a general production iOS Metal
-support claim: add remaining resource classes and GPU operations one explicit
-lowering at a time while retaining the Mac, Simulator, physical-device,
-negative-diagnostic, and no-fallback gates.
+support claim: lower remaining existing pinned public GPU operations one family
+at a time while retaining the Mac, Simulator, physical-device,
+negative-diagnostic, and no-fallback gates. Do not add resource classes absent
+from the pinned public surface.

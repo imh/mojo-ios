@@ -48,14 +48,17 @@ static ARM64 device and Simulator XCFramework variants. Captured-closure CPU
 parallelism through the normal MAX API and ordinary CPU language async through
 the existing upstream task substrate are supported.
 
-**NOT YET SUPPORTED**: stable public task construction, cancellation, async I/O,
-GPU-await, production-wide iOS Metal/GPU execution, Python, subprocesses,
-arbitrary dynamic loading, Core AI graph/runtime integration, ANE-only
-execution, a Mojo compiler or JIT in the app, and stdlib surfaces not yet
-audited or explicitly gated. The first four are absent or unfinished in the
-general upstream async surface, not special-cased iOS exclusions. Public Apple
-framework specialization of shipped Metal or Core AI artifacts is compatible
-with the AOT architecture and is not Mojo JIT.
+**DELIBERATELY ABSENT FROM THE PINNED PUBLIC SURFACE**: stable public task
+construction, cancellation, async I/O, GPU-await, textures, samplers, and
+Metal-native launch controls. They are not iOS exclusions and are not API work
+for this project.
+
+**NOT YET SUPPORTED OR FULLY VERIFIED**: production-wide coverage of existing
+public Metal/GPU and MAX operations, Python, subprocesses, arbitrary dynamic
+loading, Core AI graph/runtime integration, ANE-only execution, a Mojo compiler
+or JIT in the app, and stdlib surfaces not yet audited or explicitly gated.
+Public Apple framework specialization of shipped Metal or Core AI artifacts is
+compatible with the AOT architecture and is not Mojo JIT.
 
 Metal has passed a narrower architecture feasibility gate: an ordinary Mojo
 kernel compiles and links for iOS, and the same path executes on Mac and M4

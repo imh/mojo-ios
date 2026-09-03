@@ -5,7 +5,8 @@
 The backend is **not implemented**. This is an intentional architectural gate,
 not an invitation to add an iOS-facing Mojo API or fixed compiler pattern.
 
-The standard source spelling remains the intended contract:
+The existing generic target-selection syntax remains the only permitted source
+mechanism; `coreai` would be a backend value, not a new API:
 
 ```text
 ordinary MAX tensor operations selected for target="coreai"
@@ -18,15 +19,16 @@ ordinary MAX tensor operations selected for target="coreai"
 The open-source repository contains the standard MAX graph-building API, but
 the graph compiler and device driver are supplied by the closed `max._core`
 module. It currently knows CPU, GPU, and NPU devices and exposes no open-source
-backend registration point through which this project can add Core AI.
+internal backend registration point through which this project can add Core AI.
 
 Consequently, no source-level `coreai` target is currently registered. There
 is no `coreai` device label, `DeviceRef`, public classification helper, or
 operation-specific branch to suggest otherwise. Runtime-selected
 `DeviceContext(api="coreai")` construction fails explicitly because the
 standard graph backend is unavailable. Source-level target registration and
-operation diagnostics arrive together with the generic graph-backend
-extension, not before it.
+operation diagnostics may arrive only as a new backend value and lowering
+behind the existing generic selection and graph APIs, not as new Mojo/MAX
+types, operations, builders, annotations, or pseudo-contexts.
 
 ## Prohibited shortcuts
 
@@ -43,11 +45,12 @@ The earlier fixed two-matmul marker/pass/runtime route has been removed. The
 target contract gate scans for its compiler and ABI names so it cannot return
 silently.
 
-## Required upstream extension
+## Required internal backend plumbing
 
-Implementation resumes only after the normal MAX path exposes enough of its
-graph compiler and runtime driver to add a backend. The minimum extension must
-support:
+The normal MAX path must expose enough of its graph compiler and runtime driver
+internals to add a backend. This is implementation work for existing public MAX
+graphs, not expansion of their programming surface. The minimum internal hook
+must support:
 
 1. registering a distinct managed-graph target named `coreai`;
 2. receiving typed graph operations before their semantics are erased;
@@ -57,9 +60,9 @@ support:
    completion contracts; and
 6. composing explicitly with CPU and Metal without implicit fallback.
 
-This should be proposed upstream as a generic backend extension, not as Apple
-logic embedded in common graph passes. Once available, Core AI fills in that
-extension exactly as other targets do.
+This should be proposed upstream as a generic internal backend hook, not as
+Apple logic embedded in common graph passes and not as a public graph API. Once
+available, Core AI fills in that hook exactly as other targets do.
 
 ## Present gates
 
@@ -80,6 +83,6 @@ artifacts live under `build/` and are not Swift-package resources.
 ## Completion criterion
 
 This gate passes only when unchanged standard Mojo/MAX tensor source lowers
-through a standard MAX backend extension, packages its generated AOT resource,
+through the normal MAX path and its internal backend hook, packages its generated AOT resource,
 executes from Swift on a physical iPad, and rejects each unsupported semantic
 case explicitly. Until then, the correct result is `NotImplemented`.
