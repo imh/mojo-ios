@@ -43,7 +43,7 @@ to execute existing public syntax and semantics.
 | M3: standard library and production ABI | **mixed enablement and verification** | Complete target-sensitive inventory and production ownership/error/callback contract |
 | M4: general Metal backend | **next actionable enablement** | Declared Metal operation set passes A-series iPhone and M-series iPad release gates |
 | M5: Core AI backend for existing MAX graphs | **actionable enablement; Apple probe passes** | Add the internal MAX backend hook needed by existing public graph operations, then convert and execute the declared subset through the proved Core AI path |
-| M6: pinned public async | **verification deferred** | Existing `async def`/`await` semantics pass; broader pinned public coverage remains to inventory, and absent APIs are not added |
+| M6: pinned public async | **verification deferred** | Existing `async def`/`await` semantics pass; broader pinned public coverage remains to inventory |
 | M7: upstream and release sustainability | **pending** | Reviewable patch series, compatibility-tuple CI, signed reproducible releases |
 
 ## Enablement-first execution sequence
@@ -78,10 +78,6 @@ The canonical status remains in
 
 Core AI graph integration remains in scope only as backend plumbing for
 existing public MAX graph operations and existing device-selection machinery.
-Public task construction, cancellation, async I/O, accelerator await, textures,
-samplers, and Metal-only launch controls are absent from the pinned public
-surface and are not designed by this project. A later upstream rebase that adds
-one reopens its normal iOS implementation and verification work.
 Focused verification that is necessary to complete or prevent regressions in
 an enablement change travels with that change; this policy defers broad
 exploratory verification, not correctness evidence.
@@ -166,10 +162,6 @@ Advance one explicit operation family at a time:
 4. existing public tensor, TensorOps, and quantized operation families; and
 5. complete synchronization, error, and lifetime behavior for that surface.
 
-The pinned public surface has no textures, samplers, or Metal-native launch
-controls. Image data continues through buffers, and concrete CUDA-only launch
-attributes retain their named rejection.
-
 Every increment retains Mac, Simulator, physical-device, multi-kernel,
 negative-diagnostic, and no-fallback gates. A broad iOS/iPadOS claim requires a
 physical A-series iPhone and M-series iPad lane.
@@ -215,11 +207,8 @@ interfaces are prohibited.
 
 Ordinary public `async def`, `await`, results, errors, suspension, and resumption
 pass through generic coroutine lowering and normal Apple AsyncRT. The pinned
-surface does not publicly expose task construction, cancellation, async I/O, or
-accelerator await, so this project deliberately adds none. Re-evaluate those
-operations only after a pinned upstream revision exposes them publicly. Broader
-existing public stdlib/MAX async and concurrency coverage remains verification,
-not presumed enablement.
+public stdlib/MAX async and concurrency surface beyond that proved slice remains
+verification, not presumed enablement.
 
 ## M7: upstream and release sustainability
 

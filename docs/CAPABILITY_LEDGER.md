@@ -10,10 +10,9 @@ scanned without opening child trackers.
   the capability is broken or needs target-specific implementation.
 - Delegated trackers distinguish actionable **enablement**, expected-to-pass
   **verification**, and externally **blocked** work. Internal work that belongs
-  upstream remains enablement when needed by an existing pinned public surface;
-  absent public APIs are deliberately outside scope. Project work selects
-  enablement before broad verification; root order remains a stable coverage
-  index rather than a priority queue.
+  upstream remains enablement when needed by an existing pinned public surface.
+  Project work selects enablement before broad verification; root order remains
+  a stable coverage index rather than a priority queue.
 - A checked parent may not have an unchecked descendant.
 - Children are optional detail, not another status. Large branches link to
   another Markdown tracker using the same syntax.
@@ -22,7 +21,7 @@ scanned without opening child trackers.
 - [ ] **Standard library and native dependencies**: Verification — The audited Darwin slice works; broad target-sensitive coverage remains unclassified. [tracker](trackers/stdlib-native.md)
 - [ ] **Standard MAX**: Mixed — `max.algorithm.parallelize` works; broader existing public libraries need verification and Core AI needs a normal internal backend hook plus its Apple implementation. [tracker](trackers/max-standard.md)
 - [x] **Embedded runtime**: The complete pinned CompilerRT/DeviceContext C ABI and same-tuple process-lifecycle contract are implemented or rejected explicitly. [tracker](trackers/embedded-runtime.md)
-- [ ] **Async and concurrency**: Verification — Ordinary public language async works; the broader pinned public async/concurrency inventory remains unverified, while absent task, cancellation, async-I/O, and accelerator-await APIs are deliberately not added. [tracker](trackers/async-concurrency.md)
+- [ ] **Async and concurrency**: Verification — Ordinary public language async works; the broader pinned public async/concurrency inventory remains unverified. [tracker](trackers/async-concurrency.md)
 - [ ] **Swift ABI and AOT artifacts**: Enablement — The sample ABI and static package work, but production ownership/error conventions and cross-version composition are known missing contracts. [tracker](trackers/swift-abi-artifacts.md)
 - [ ] **Metal**: Enablement — General value/buffer argument inference and layout pass host, Simulator, and physical-iPad gates; existing atomics/synchronization, debug, current-AIR, and tensor paths still need normal backend implementation. [tracker](trackers/metal.md)
 - [ ] **Core AI and ANE**: Enablement — Direct Apple feasibility works; the remaining work is a normal internal MAX backend hook for existing public graph operations, Core AI conversion, packaging, and runtime composition. [tracker](trackers/coreai.md)

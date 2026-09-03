@@ -31,8 +31,8 @@ upstream-compatible static architecture exists.
 The pinned upstream public Mojo/MAX surface is also the scope boundary. This
 project adds target, compiler, backend, and runtime implementation needed to
 execute that surface on iOS; it does not invent or publicize Mojo/MAX APIs for
-capabilities the pinned source cannot express. A later pinned upstream revision
-that adds a public surface reopens its iOS disposition.
+capabilities the pinned source cannot express. Such capabilities are outside
+this plan and its tracker hierarchy.
 
 App Store compliance is an evidence ladder, not a property inferred from
 successful compilation. The project distinguishes architecture compliance,
@@ -116,8 +116,7 @@ products remain separate.
 Unchecked work is classified as actionable **enablement**, expected-to-pass
 **verification**, or **blocked** on a genuinely external unavailable
 prerequisite. Internal upstream architecture needed by an existing pinned
-public surface is enablement, not blocked; absent public surfaces are
-deliberately outside scope. Regressions and
+public surface is enablement, not blocked. Regressions and
 actionable enablement outrank broad verification regardless of milestone
 number. Verification required to complete an enablement change remains part of
 that change's correctness gate. The current ordered queue is maintained in
@@ -221,10 +220,8 @@ Produce a release package, not merely a smoke-test archive:
 ### 6. Async and concurrency
 
 Preserve the implemented generic language async and CPU parallelism routes.
-The pinned surface does not publicly expose task construction, cancellation,
-async I/O, GPU-await, or abandoned-task control, so record those absences and
-do not create an iOS or general replacement. Reopen them only after a pinned
-upstream revision exposes public semantics.
+Inventory and verify the remaining pinned public stdlib/MAX async and
+concurrency operations reachable by an AOT library.
 
 ### 7. Metal programmable accelerator coverage
 
@@ -237,11 +234,6 @@ Advance one explicit operation family at a time:
 - Metal lowering for existing pinned public quantized operations and their
   availability diagnostics; and
 - complete error, synchronization, and lifetime tests for existing resources.
-
-The pinned public surface has no general texture, sampler, or Metal-native
-launch-control API. This project adds none: ordinary image data remains usable
-through buffers, while the existing CUDA-shaped launch surface keeps its named
-Metal rejections.
 
 Every increment retains Mac, Simulator, physical-device, multi-kernel,
 negative-diagnostic, and no-fallback gates. The physical matrix must include an
@@ -433,8 +425,6 @@ fallback and with placement claims limited to observable evidence.
   resumption through generic lowering and normal AsyncRT.
 - Inventory and verify any other pinned public stdlib/MAX async and concurrency
   operations reachable by an AOT library.
-- Record task construction, cancellation, async I/O, and accelerator await as
-  absent from the pinned public surface rather than adding contracts.
 
 Exit: every pinned public async capability is classified and the existing
 public subset passes its lifetime and error gates.

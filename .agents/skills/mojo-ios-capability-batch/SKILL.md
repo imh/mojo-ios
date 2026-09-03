@@ -36,7 +36,8 @@ Never classify work as **blocked** only because the correction belongs upstream
 or needs an internal general extension point to carry existing public semantics.
 Reserve blocked for a prerequisite outside the project's chosen implementation
 scope that cannot presently be advanced. A capability absent from the pinned
-public surface is deliberately outside scope rather than blocked or enablement.
+public surface is outside scope rather than blocked or enablement and must not
+be added to a roadmap or tracker.
 Do not let milestone numbering or an unchecked verification row outrank
 actionable enablement. If verification discovers a concrete failure,
 reclassify that scope as enablement before expanding the fix.

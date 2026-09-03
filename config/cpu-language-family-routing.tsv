@@ -10,6 +10,6 @@ compile-time-and-reflection	KGEN/test/mojo-integration/comptime_tuples_e2e.mojo,
 memory-and-pointers	mojo/stdlib/test/memory	M2-portable-corpus	Allocation, pointer, ownership, initialization, and bounds semantics
 portable-collections-and-iteration	mojo/stdlib/test/collections,mojo/stdlib/test/iter,mojo/stdlib/test/itertools	M2-portable-corpus	Target-independent container and iterator semantics
 target-sensitive-standard-library	mojo/stdlib/test/io,mojo/stdlib/test/os,mojo/stdlib/test/pathlib,mojo/stdlib/test/subprocess,mojo/stdlib/test/time	M3-stdlib-native	Darwin APIs, sandbox behavior, availability, and native dependencies
-async-and-concurrency	mojo/stdlib/test/runtime,max/mojo/test	M6-async	Pinned public async and concurrency verification; absent public contracts are not project API work
+async-and-concurrency	mojo/stdlib/test/runtime,max/mojo/test	M6-async	Pinned public async and concurrency verification
 accelerators-and-graphs	mojo/stdlib/test/gpu,max	M4-M5-accelerators	Programmable Metal and standard MAX graph backend coverage
 host-tools-and-dynamic-environments	KGEN/test/mojo-tool,KGEN/test/mojo-jupyter,mojo/python	outside-shipped-AOT	Compiler, REPL, notebook, Python, and JIT host behavior is not shipped application code

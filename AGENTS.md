@@ -11,8 +11,8 @@ The pinned upstream public Mojo/MAX surface is the product boundary. Do not add
 new public language or library APIs, or promote private APIs to public, in order
 to create iOS work. Internal compiler, backend, and runtime architecture may be
 extended only to carry an existing public program through its normal semantics.
-If the pinned public surface cannot express a capability, record that deliberate
-absence and revisit it only when a later pinned upstream revision exposes it.
+If the pinned public surface cannot express a capability, it is outside this
+project and must not appear as a roadmap or tracker item.
 
 Treat an upstream-compatible missing lowering, Darwin implementation, runtime
 operation, target backend operation, or packaging step as the work. Do not make
@@ -85,8 +85,7 @@ Use only this terse tracker form:
 - Keep incomplete work in three explicit classes:
   - **Enablement** is a reproduced failure or source-confirmed missing normal
     path for an existing pinned public surface, with actionable implementation
-    or internal upstream architecture work. An absent public Mojo/MAX contract
-    is outside the pinned surface, not an invitation to design one here.
+    or internal upstream architecture work.
   - **Verification** is an unproved surface expected to work through existing
     normal paths. It does not outrank known enablement work.
   - **Blocked** is a confirmed gap that cannot presently advance because an
@@ -99,6 +98,8 @@ Use only this terse tracker form:
   scope as enablement before expanding or fixing it.
 - Description text describes the capability and its current boundary. It must
   not use decomposition state as a substitute for a real description.
+- Do not create checked or unchecked tracker rows for capabilities absent from
+  the pinned public Mojo/MAX surface. They are outside the coverage graph.
 - Decomposition is optional structure, not a status or disposition. Add nested
   children or one linked `[tracker](...)` file only when finer tracking is
   useful. A leaf may remain broad and unchecked.
