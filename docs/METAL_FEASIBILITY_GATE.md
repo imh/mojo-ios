@@ -29,6 +29,9 @@ normal offload interfaces and the standard AsyncRT C ABI.
   value-taking `enqueue_function` path without another overload or ABI.
 - Static shared allocations and dynamic `external_memory` lower to Metal
   threadgroup storage.
+- O0 uses required AIR canonicalization and legalization without substituting
+  the optimized module pipeline; builtin-dependent helpers are mandatory-inline
+  while unrelated helpers remain intact. O3 retains the optimized pipeline.
 - Legalized modules are written as LLVM 17 bitcode.
 - Object emission invokes Apple's Metal compiler to package AIR as a
   `metallib`; `MOJO_METAL_COMPILER_PATH` overrides the normal `xcrun` lookup.
@@ -57,6 +60,8 @@ The embedded Apple AsyncRT target implements the existing symbols used by
 - exact ABI validation for launch attributes, accepting `IGNORE` and rejecting
   every CUDA-only value by name;
 - compute dispatch and synchronization.
+- the existing constant-memory-copy ABI, with a named owned error because
+  dynamic Metal constant-memory mapping is not implemented.
 
 The CPU and Metal implementations share the normal DeviceContext entry points.
 Dynamic requests for unavailable devices or unimplemented features return
@@ -81,9 +86,9 @@ argument is also rejected by name: nested device pointers must denote standard
 `AddressSpace.GLOBAL` memory. The pinned public Mojo/MAX surface has no general
 texture, sampler, or Metal-native launch-control API, so this project
 deliberately adds none; ordinary image data remains usable through standard
-buffers. Still outside this boundary are existing public atomics, barriers,
-simdgroups, tensor operations, and a distinct AIR O0 pipeline. They must gain an
-explicit lowering or remain an explicit failure; there is no CPU fallback.
+buffers. Still outside this boundary are full debug, existing public atomics,
+barriers, simdgroups, and tensor operations. They must gain an explicit
+lowering or remain an explicit failure; there is no CPU fallback.
 
 ## Evidence and remaining gate
 
@@ -108,6 +113,11 @@ read/write access metadata, and the named host/iOS rejection boundaries. The
 generic fixed-closure-to-pack adaptor has a parser regression in
 `KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo`; the Metal
 encoder independently checks nested buffer registration and byte offsets.
+
+[`METAL_O0_DEBUG_GATE.md`](METAL_O0_DEBUG_GATE.md) proves true O0, O3
+non-regression, line-table AIR and metallib debug companions, both Simulator
+classes, and physical-iPad O0 execution. Full debug is rejected by name before
+Apple tool invocation because the current full-debug AIR crashes `air-lld`.
 
 This completes the useful Metal MVP. It is not a general production iOS Metal
 support claim: lower remaining existing pinned public GPU operations one family

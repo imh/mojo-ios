@@ -54,9 +54,8 @@ The canonical status remains in
 
 1. Repair regressions in already proved behavior.
 2. Complete actionable known gaps in the normal
-   [Metal backend](trackers/metal.md), in tracker order: atomics,
-   synchronization and memory semantics, O0/debug, current Metal/AIR targets,
-   then existing public tensor and quantized operations.
+   [Metal backend](trackers/metal.md), in tracker order: full debug, current
+   Metal/AIR targets, then existing public tensor and quantized operations.
 3. Complete the known missing production ownership, error, and composition
    contracts in the [Swift/C ABI](trackers/swift-abi-artifacts.md).
 4. Select and encode the base minimum/latest OS policy in
@@ -156,11 +155,12 @@ accepted for production submission and its own device/package gates pass.
 
 Advance one explicit operation family at a time:
 
-1. atomics, barriers, simdgroups, and memory ordering;
-2. valid AIR O0/debug lowering;
-3. current Metal/AIR target registration;
-4. existing public tensor, TensorOps, and quantized operation families; and
-5. complete synchronization, error, and lifetime behavior for that surface.
+1. valid AIR optimization and debug lowering;
+2. current Metal/AIR target registration;
+3. existing public tensor, TensorOps, and quantized operation families;
+4. complete synchronization, error, and lifetime behavior for that surface;
+   and
+5. verification of atomics, barriers, simdgroups, and memory ordering.
 
 Every increment retains Mac, Simulator, physical-device, multi-kernel,
 negative-diagnostic, and no-fallback gates. A broad iOS/iPadOS claim requires a
@@ -230,9 +230,10 @@ its milestone number is lower. Never select blocked work until its recorded
 prerequisite changes, and never weaken architectural invariants to bypass a
 blocker.
 
-The next implementation work is the existing public Metal synchronization and
-memory surface, beginning with atomics, barriers, and simdgroups through the
-normal offload and DeviceContext paths.
+The next actionable implementation work is full AIR debug metadata lowering;
+current Metal/AIR target registration follows it. Atomics, barriers, and
+simdgroups are verification work until execution exposes a concrete missing
+normal path.
 The remaining M2 CPU and closure inventory is deliberately parked as
 verification debt, not treated as evidence of missing iOS implementations.
 

@@ -49,6 +49,7 @@ test-runtime-lifecycle-sanitizers = "./scripts/test-runtime-lifecycle-sanitizers
 test-runtime-lifecycle-simulators = "./scripts/test-runtime-lifecycle-simulators.sh"
 test-runtime-lifecycle-device = "./scripts/test-runtime-lifecycle-device.sh"
 test-metal-feasibility = "./scripts/test-metal-feasibility.sh"
+test-metal-o0-debug = "./scripts/test-metal-o0-debug.sh"
 test-metal-device = "./scripts/test-metal-device.sh"
 bootstrap-coreai-authoring = "./scripts/bootstrap-coreai-authoring.sh"
 test-coreai-feasibility = "./scripts/test-coreai-feasibility.sh"

@@ -8,8 +8,10 @@ stdlib_path="${upstream_root}/mojo/stdlib"
 max_path="${upstream_root}/max/mojo"
 probe_path="${project_root}/probes/IOSMetalVectorAddProbe.mojo"
 harness_path="${project_root}/tests/MetalHostVectorAddSmoke.c"
-output_root="${project_root}/build/metal-gate"
+output_root="${MOJO_IOS_METAL_OUTPUT_ROOT:-${project_root}/build/metal-gate}"
 compiler_state_root="${MOJO_IOS_METAL_COMPILER_STATE_ROOT:-${project_root}/build/compiler-state/metal}"
+optimization_level="${MOJO_IOS_METAL_OPTIMIZATION_LEVEL:-3}"
+debug_level="${MOJO_IOS_METAL_DEBUG_LEVEL:-none}"
 device_context_source="${upstream_root}/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c"
 apple_work_queue_source="${upstream_root}/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c"
 metal_context_source="${upstream_root}/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m"
@@ -17,6 +19,15 @@ asyncrt_headers="${upstream_root}/AsyncRT/include"
 compiler_rt_source="${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c"
 kgen_asyncrt_source="${upstream_root}/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c"
 globals_source="${upstream_root}/KGEN/lib/CompilerRT/Embedded/Globals.c"
+
+case "${optimization_level}" in 0|1|2|3) ;; *)
+  echo "MOJO_IOS_METAL_OPTIMIZATION_LEVEL must be 0, 1, 2, or 3" >&2
+  exit 2
+esac
+case "${debug_level}" in none|line-tables|full) ;; *)
+  echo "MOJO_IOS_METAL_DEBUG_LEVEL must be none, line-tables, or full" >&2
+  exit 2
+esac
 
 metal_compiler="${MOJO_IOS_METAL_COMPILER_PATH:-}"
 if [[ -z "${metal_compiler}" ]]; then
@@ -78,7 +89,8 @@ compile_mojo_probe() {
     --target-triple "${target_triple}" \
     --target-cpu "${target_arch}" \
     --target-accelerator "${target_arch}" \
-    --optimization-level 3 \
+    --optimization-level "${optimization_level}" \
+    --debug-level "${debug_level}" \
     -DMOJO_IOS_DUMP_METAL_ARGUMENT_LLVM="${argument_dump_value}" \
     -o "${output_path}"
   local metal_library_count
@@ -220,4 +232,4 @@ else
   "${output_root}/MetalHostVectorAddSmoke"
 fi
 
-echo "verified the heterogeneous Mojo Metal argument and useful-MVP matrix on iOS linkage, ARM64 Simulator, and macOS GPU execution"
+echo "verified the heterogeneous Mojo Metal argument and useful-MVP matrix on iOS linkage, ARM64 Simulator, and macOS GPU execution at O${optimization_level} debug=${debug_level}"

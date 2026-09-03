@@ -1,5 +1,5 @@
 diff --git a/AsyncRT/BUILD.bazel b/AsyncRT/BUILD.bazel
-index 5df0b2db1c12ab978176275d619962de0ab5b195..0cad10ff15c0fe6393bda53dfacaf93b48bc3cb3 100644
+index 5df0b2db1c..0cad10ff15 100644
 --- a/AsyncRT/BUILD.bazel
 +++ b/AsyncRT/BUILD.bazel
 @@ -1,4 +1,5 @@
@@ -72,10 +72,10 @@ index 5df0b2db1c12ab978176275d619962de0ab5b195..0cad10ff15c0fe6393bda53dfacaf93b
      srcs = glob(["lib/Runtime/Globals/*.cpp"]),
 diff --git a/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h b/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..b38c09c9f6ae121a0fd64617c2c41f771c8bf8ae
+index 0000000000..c27f5b5f95
 --- /dev/null
 +++ b/AsyncRT/include/AsyncRT/Runtime/DeviceContextCAPI.h
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,81 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -141,6 +141,9 @@ index 0000000000000000000000000000000000000000..b38c09c9f6ae121a0fd64617c2c41f77
 +    int32_t optimization_level);
 +void AsyncRT_DeviceFunction_retain(void *function);
 +void AsyncRT_DeviceFunction_release(void *function);
++const char *AsyncRT_DeviceFunction_copyToConstantMemory(
++    void *function, const void *name, size_t name_size, const void *data,
++    size_t data_size);
 +
 +const char *AsyncRT_DeviceContext_enqueueFunctionDirect(
 +    void *context, void *function, uint32_t grid_x, uint32_t grid_y,
@@ -156,7 +159,7 @@ index 0000000000000000000000000000000000000000..b38c09c9f6ae121a0fd64617c2c41f77
 +#endif // ASYNCRT_RUNTIME_DEVICE_CONTEXT_C_API_H
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h b/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..612c6a8b4a49f0614e02f2fb123f026a4dd528aa
+index 0000000000..612c6a8b4a
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleDeviceContextInternal.h
 @@ -0,0 +1,42 @@
@@ -204,7 +207,7 @@ index 0000000000000000000000000000000000000000..612c6a8b4a49f0614e02f2fb123f026a
 +#endif // ASYNCRT_RUNTIME_APPLE_DEVICE_CONTEXT_INTERNAL_H
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..68ff88fdc72055228a33bb07a5a804f2f56e5e70
+index 0000000000..68ff88fdc7
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.c
 @@ -0,0 +1,164 @@
@@ -374,7 +377,7 @@ index 0000000000000000000000000000000000000000..68ff88fdc72055228a33bb07a5a804f2
 +#endif
 diff --git a/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.h b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..5f56e4b20a1d15577209a44691af1bd95019efe1
+index 0000000000..5f56e4b20a
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/AppleWorkQueue.h
 @@ -0,0 +1,28 @@
@@ -408,7 +411,7 @@ index 0000000000000000000000000000000000000000..5f56e4b20a1d15577209a44691af1bd9
 +#endif // ASYNCRT_RUNTIME_APPLE_WORK_QUEUE_H
 diff --git a/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..e01e03f46a94be57dfa71c2d5ff4b4004c285e5f
+index 0000000000..e01e03f46a
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/DeviceContextCAPI.c
 @@ -0,0 +1,288 @@
@@ -702,10 +705,10 @@ index 0000000000000000000000000000000000000000..e01e03f46a94be57dfa71c2d5ff4b400
 +}
 diff --git a/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
 new file mode 100644
-index 0000000000000000000000000000000000000000..429ac924cb80b3bdf4349ff2444f1840d27b130d
+index 0000000000..7c5534cefa
 --- /dev/null
 +++ b/AsyncRT/lib/Runtime/Apple/MetalDeviceContextCAPI.m
-@@ -0,0 +1,893 @@
+@@ -0,0 +1,907 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -1359,6 +1362,20 @@ index 0000000000000000000000000000000000000000..429ac924cb80b3bdf4349ff2444f1840
 +  }
 +}
 +
++const char *AsyncRT_DeviceFunction_copyToConstantMemory(
++    void *untyped_function, const void *name, size_t name_size,
++    const void *data, size_t data_size) {
++  @autoreleasepool {
++    (void)asyncrt_metal_function_from_untyped(untyped_function);
++    (void)name;
++    (void)name_size;
++    (void)data;
++    (void)data_size;
++    return asyncrt_metal_owned_error(
++        "Metal constant-memory mapping is not implemented");
++  }
++}
++
 +const char *AsyncRT_DeviceContext_enqueueFunctionDirect(
 +    void *untyped_context, void *untyped_function, uint32_t grid_x,
 +    uint32_t grid_y, uint32_t grid_z, uint32_t block_x, uint32_t block_y,
@@ -1600,7 +1617,7 @@ index 0000000000000000000000000000000000000000..429ac924cb80b3bdf4349ff2444f1840
 +  }
 +}
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 3e759c983d077baf7c997c07f8322a426a02a2e8..d79800d6510d86da77c1babc3e67aac9dd040f7d 100644
+index 3e759c983d..d79800d651 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -175,6 +175,16 @@ config_setting(
@@ -1621,7 +1638,7 @@ index 3e759c983d077baf7c997c07f8322a426a02a2e8..d79800d6510d86da77c1babc3e67aac9
      name = "lint",
      actual = "//bazel/lint",
 diff --git a/KGEN/BUILD.bazel b/KGEN/BUILD.bazel
-index cf9ed18d582cc87483aef0c15450bcff4aa0dd5d..9f9831d3699c12402baeaedd3335f72c2841c7a7 100644
+index cf9ed18d58..9f9831d369 100644
 --- a/KGEN/BUILD.bazel
 +++ b/KGEN/BUILD.bazel
 @@ -1002,6 +1002,24 @@ modular_shared_library(
@@ -1650,7 +1667,7 @@ index cf9ed18d582cc87483aef0c15450bcff4aa0dd5d..9f9831d3699c12402baeaedd3335f72c
      name = "Support",
      srcs = glob(
 diff --git a/KGEN/include/KGEN/KGENDialect/KGENOps.td b/KGEN/include/KGEN/KGENDialect/KGENOps.td
-index 509bbf7d795a938927d144b548f80938197df02d..ba69f18d82cbe17cb77ad401d66bd238fc5b7b67 100644
+index 509bbf7d79..ba69f18d82 100644
 --- a/KGEN/include/KGEN/KGENDialect/KGENOps.td
 +++ b/KGEN/include/KGEN/KGENDialect/KGENOps.td
 @@ -1914,6 +1914,7 @@ def KGEN_CompileOffloadOp: KGENOp<"compile_offload">  {
@@ -1672,7 +1689,7 @@ index 509bbf7d795a938927d144b548f80938197df02d..ba69f18d82cbe17cb77ad401d66bd238
  
  
 diff --git a/KGEN/include/KGEN/ToolCommon/KGENPasses.h b/KGEN/include/KGEN/ToolCommon/KGENPasses.h
-index 0fbfeb3c1e4b1c7e4861531a493b3ebb43779b1e..437197dbcde1e76efc20e08fab79118f4751046b 100644
+index 0fbfeb3c1e..437197dbcd 100644
 --- a/KGEN/include/KGEN/ToolCommon/KGENPasses.h
 +++ b/KGEN/include/KGEN/ToolCommon/KGENPasses.h
 @@ -124,6 +124,10 @@ struct OffloadInfo {
@@ -1696,7 +1713,7 @@ index 0fbfeb3c1e4b1c7e4861531a493b3ebb43779b1e..437197dbcde1e76efc20e08fab79118f
  
    /// Hashed module name based on contents.
 diff --git a/KGEN/lib/Compiler/KGENCompiler.cpp b/KGEN/lib/Compiler/KGENCompiler.cpp
-index 221f0a50a76ff71eda24709e4bd188cb5f51962b..6055052749e28e461d46aa35265c6a8f1c0f9d50 100644
+index 221f0a50a7..6055052749 100644
 --- a/KGEN/lib/Compiler/KGENCompiler.cpp
 +++ b/KGEN/lib/Compiler/KGENCompiler.cpp
 @@ -19,6 +19,7 @@
@@ -1858,7 +1875,7 @@ index 221f0a50a76ff71eda24709e4bd188cb5f51962b..6055052749e28e461d46aa35265c6a8f
  
        // Reset the global llvm options once compiling this target is done.
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h
-index b71bd3bc86cf4dd00226cb22a55e8bd41f0dcb6a..8a5d9f727135806c5048f3ff513c98d64a409e05 100644
+index b71bd3bc86..8a5d9f7271 100644
 --- a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Bitcode/17/BitcodeWriter17.h
 @@ -35,6 +35,14 @@ class raw_ostream;
@@ -1878,10 +1895,10 @@ index b71bd3bc86cf4dd00226cb22a55e8bd41f0dcb6a..8a5d9f727135806c5048f3ff513c98d6
  /// required for Metal compatibility.
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..b0b2bd4774c2282c94afb00e9c57fb9970241f96
+index 0000000000..89a1c3ce74
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.cpp
-@@ -0,0 +1,774 @@
+@@ -0,0 +1,832 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -1892,6 +1909,7 @@ index 0000000000000000000000000000000000000000..b0b2bd4774c2282c94afb00e9c57fb99
 +#include "MetalAIRPass.h"
 +
 +#include "llvm/ADT/SmallSet.h"
++#include "llvm/ADT/SmallPtrSet.h"
 +#include "llvm/ADT/SmallVector.h"
 +#include "llvm/IR/Constants.h"
 +#include "llvm/IR/Function.h"
@@ -2095,6 +2113,24 @@ index 0000000000000000000000000000000000000000..b0b2bd4774c2282c94afb00e9c57fb99
 +  llvm::SmallSet<const llvm::Function *, 8> kernelSet;
 +  for (llvm::Function *kernel : kernels)
 +    kernelSet.insert(kernel);
++
++  for (const MetalBuiltinFamily &family : kSupportedBuiltinFamilies) {
++    for (llvm::StringRef dimension : kBuiltinDimensions) {
++      llvm::Function *declaration = module.getFunction(
++          (family.functionNamePrefix + dimension).str());
++      if (!declaration)
++        continue;
++      for (llvm::User *user : declaration->users()) {
++        auto *call = llvm::dyn_cast<llvm::CallBase>(user);
++        if (!call || !call->getFunction() ||
++            !kernelSet.contains(call->getFunction()))
++          return llvm::createStringError(
++              llvm::inconvertibleErrorCode(),
++              "Metal builtin use outside a kernel after mandatory inlining "
++              "is not implemented");
++      }
++    }
++  }
 +
 +  const llvm::DataLayout &layout = module.getDataLayout();
 +  for (llvm::Function *kernel : kernels) {
@@ -2586,6 +2622,45 @@ index 0000000000000000000000000000000000000000..b0b2bd4774c2282c94afb00e9c57fb99
 +    function.removeFnAttr("target-cpu");
 +    function.removeFnAttr("target-features");
 +  }
++
++  // AIR represents thread and grid positions as kernel arguments.  Device
++  // helpers that read those builtins must therefore be inlined before the
++  // kernel ABI is formed.  Mark only that transitive slice of the call graph;
++  // unrelated helpers remain ordinary functions at O0.
++  llvm::SmallVector<llvm::Function *> worklist;
++  llvm::SmallPtrSet<llvm::Function *, 16> builtinDependentFunctions;
++  for (const MetalBuiltinFamily &family : kSupportedBuiltinFamilies) {
++    for (llvm::StringRef dimension : kBuiltinDimensions) {
++      llvm::Function *declaration = module.getFunction(
++          (family.functionNamePrefix + dimension).str());
++      if (!declaration)
++        continue;
++      for (llvm::User *user : declaration->users()) {
++        auto *call = llvm::dyn_cast<llvm::CallBase>(user);
++        if (!call || !call->getFunction())
++          continue;
++        worklist.push_back(call->getFunction());
++      }
++    }
++  }
++  while (!worklist.empty()) {
++    llvm::Function *function = worklist.pop_back_val();
++    if (!builtinDependentFunctions.insert(function).second)
++      continue;
++    for (llvm::User *user : function->users()) {
++      auto *call = llvm::dyn_cast<llvm::CallBase>(user);
++      if (call && call->getFunction())
++        worklist.push_back(call->getFunction());
++    }
++  }
++  for (llvm::Function *function : builtinDependentFunctions) {
++    if (function->hasFnAttribute(kMetalKernelAttribute))
++      continue;
++    function->removeFnAttr(llvm::Attribute::NoInline);
++    function->removeFnAttr(llvm::Attribute::OptimizeNone);
++    function->addFnAttr(llvm::Attribute::AlwaysInline);
++    changed = true;
++  }
 +  return changed ? llvm::PreservedAnalyses::none()
 +                 : llvm::PreservedAnalyses::all();
 +}
@@ -2658,7 +2733,7 @@ index 0000000000000000000000000000000000000000..b0b2bd4774c2282c94afb00e9c57fb99
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..a41ca765d1a3b5834638bd6b3c6f7bd942ffd2bb
+index 0000000000..a41ca765d1
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/LLVM/Transforms/MetalAIRPass.h
 @@ -0,0 +1,46 @@
@@ -2709,7 +2784,7 @@ index 0000000000000000000000000000000000000000..a41ca765d1a3b5834638bd6b3c6f7bd9
 +
 +#endif // KGEN_COMPILER_LLVMIR_TRANSFORMS_METALAIRPASS_H
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp b/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
-index fcd0786720d9d4f7eb488c20ffdd5681200e8e9e..cebfc34515922581c01a3cfb8afc01cb60f6403e 100644
+index fcd0786720..cebfc34515 100644
 --- a/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
 +++ b/KGEN/lib/Compiler/ObjectCompiler/ObjectCompiler.cpp
 @@ -39,6 +39,7 @@
@@ -2734,10 +2809,10 @@ index fcd0786720d9d4f7eb488c20ffdd5681200e8e9e..cebfc34515922581c01a3cfb8afc01cb
    if (!llvmModule)
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8af2f6c344b8b47347232b86703661d284a69b0d
+index 0000000000..d9c706cc06
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.cpp
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,227 @@
 +//===----------------------------------------------------------------------===//
 +// Copyright (c) 2026, Modular Inc. All rights reserved.
 +//
@@ -2763,6 +2838,11 @@ index 0000000000000000000000000000000000000000..8af2f6c344b8b47347232b86703661d2
 +#include "llvm/Support/raw_ostream.h"
 +#include "llvm/Target/TargetMachine.h"
 +#include "llvm/TargetParser/Triple.h"
++#include "llvm/Transforms/IPO/AlwaysInliner.h"
++#include "llvm/Transforms/InstCombine/InstCombine.h"
++#include "llvm/Transforms/Scalar/EarlyCSE.h"
++#include "llvm/Transforms/Scalar/SROA.h"
++#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 +#include "llvm/Transforms/Scalar/InferAddressSpaces.h"
 +
 +namespace M::KGEN {
@@ -2795,15 +2875,31 @@ index 0000000000000000000000000000000000000000..8af2f6c344b8b47347232b86703661d2
 +bool MetalBackend::buildLLVMPipeline(llvm::ModulePassManager &manager,
 +                                     llvm::PassBuilder &passBuilder,
 +                                     const CompilationOptions &options) const {
-+  // AIR is a legalization target, not an LLVM machine-code backend. Run a
-+  // stable canonical optimization pipeline first so kernel argument uses are
-+  // explicit, then apply the AIR ABI and LLVM-17 compatibility transforms.
-+  // O0 support remains an explicit follow-up gate; silently emitting the
-+  // uncanonicalized O0 module would produce ambiguous AIR argument metadata.
-+  (void)options;
++  assert(options.optimizationLevel <= 3 &&
++         "Metal backend received an invalid optimization level");
++
++  // AIR is a legalization target, not an LLVM machine-code backend. Preserve
++  // the requested optimization policy, then apply the AIR ABI and LLVM-17
++  // compatibility transforms at every level. In particular, O0 must not rely
++  // on an optimized pipeline to make the module valid.
 +  manager.addPass(PrepareMetalAIRPass());
-+  manager.addPass(
-+      passBuilder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2));
++  if (options.getCodeGenOptLevel() == llvm::CodeGenOptLevel::None) {
++    manager.addPass(llvm::AlwaysInlinerPass(
++        /*InsertLifetimeIntrinsics=*/false));
++    llvm::FunctionPassManager canonicalizeFunctions;
++    canonicalizeFunctions.addPass(llvm::SimplifyCFGPass());
++    canonicalizeFunctions.addPass(
++        llvm::SROAPass(llvm::SROAOptions::ModifyCFG));
++    canonicalizeFunctions.addPass(llvm::EarlyCSEPass());
++    canonicalizeFunctions.addPass(llvm::InstCombinePass());
++    manager.addPass(llvm::createModuleToFunctionPassAdaptor(
++        std::move(canonicalizeFunctions)));
++  } else {
++    // Match the ordinary KGEN policy: all non-zero source optimization levels
++    // currently use the fully optimized LLVM pipeline.
++    manager.addPass(passBuilder.buildPerModuleDefaultPipeline(
++        llvm::OptimizationLevel::O3));
++  }
 +  manager.addPass(MetalAIRPass());
 +  manager.addPass(llvm::createModuleToFunctionPassAdaptor(
 +      llvm::InferAddressSpacesPass(/*AddressSpace=*/0)));
@@ -2830,9 +2926,11 @@ index 0000000000000000000000000000000000000000..8af2f6c344b8b47347232b86703661d2
 +
 +ErrorOr<BufferRef> MetalBackend::emitObject(llvm::Module &module,
 +                                            EmitContext &ctx) const {
-+  (void)ctx;
 +  if (std::optional<std::string> error = getMetalAIRLoweringError(module))
 +    return Error(*error);
++  if (ctx.options.debugLevel == CompilationOptions::kFullDebugInfo)
++    return Error("Metal full debug information is not implemented; use "
++                 "--debug-level=line-tables or --debug-level=none");
 +  ErrorOr<TempFile> airFileOr =
 +      writeTempFile("mojo-metal-%%%%%%.air", [&](llvm::raw_ostream &output) {
 +        LLVM::WriteBitcode17ToFile(module, output,
@@ -2944,7 +3042,7 @@ index 0000000000000000000000000000000000000000..8af2f6c344b8b47347232b86703661d2
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.h b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..ab61976090fc28920d47ff69d8d73c236904eaa3
+index 0000000000..ab61976090
 --- /dev/null
 +++ b/KGEN/lib/Compiler/ObjectCompiler/Target/Metal/MetalBackend.h
 @@ -0,0 +1,53 @@
@@ -3003,7 +3101,7 @@ index 0000000000000000000000000000000000000000..ab61976090fc28920d47ff69d8d73c23
 +#endif // KGEN_COMPILER_TARGET_METAL_METALBACKEND_H
 diff --git a/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c b/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..1a9f8da4c33f3333edbbe1216c09954c11d026e3
+index 0000000000..1a9f8da4c3
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Apple/AsyncRT.c
 @@ -0,0 +1,409 @@
@@ -3418,7 +3516,7 @@ index 0000000000000000000000000000000000000000..1a9f8da4c33f3333edbbe1216c09954c
 +}
 diff --git a/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c b/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..596483500bdff51f2b901a6c02cd8536d2adaaa4
+index 0000000000..596483500b
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Apple/CompilerRT.c
 @@ -0,0 +1,230 @@
@@ -3654,7 +3752,7 @@ index 0000000000000000000000000000000000000000..596483500bdff51f2b901a6c02cd8536
 +}
 diff --git a/KGEN/lib/CompilerRT/Embedded/Globals.c b/KGEN/lib/CompilerRT/Embedded/Globals.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..e56e9fcb3c5a75353f59d012b56424563b68c603
+index 0000000000..e56e9fcb3c
 --- /dev/null
 +++ b/KGEN/lib/CompilerRT/Embedded/Globals.c
 @@ -0,0 +1,312 @@
@@ -3971,7 +4069,7 @@ index 0000000000000000000000000000000000000000..e56e9fcb3c5a75353f59d012b5642456
 +  }
 +}
 diff --git a/KGEN/lib/Elaborator/Elaborator.cpp b/KGEN/lib/Elaborator/Elaborator.cpp
-index 0fe694d9c62e0b2eb31e59c62b0474b2baa71fe1..11d3b0fbaedc3aa8bf683287a7feb9073ab7e27d 100644
+index 0fe694d9c6..11d3b0fbae 100644
 --- a/KGEN/lib/Elaborator/Elaborator.cpp
 +++ b/KGEN/lib/Elaborator/Elaborator.cpp
 @@ -1974,6 +1974,60 @@ ErrorTreeOrSuccess Elaborator::bundleCompileOffloadOp(CompileOffloadOp op,
@@ -4103,7 +4201,7 @@ index 0fe694d9c62e0b2eb31e59c62b0474b2baa71fe1..11d3b0fbaedc3aa8bf683287a7feb907
    values.push_back(numCapturesV);
    values.push_back(opaqueCaptureSizesV);
 diff --git a/KGEN/lib/Elaborator/IREvaluatorContext.cpp b/KGEN/lib/Elaborator/IREvaluatorContext.cpp
-index 3229d05f57e3bd233c7064977a3752a63e38db99..152c6f781d7166652bb567ef659fb234dedf0647 100644
+index 3229d05f57..152c6f781d 100644
 --- a/KGEN/lib/Elaborator/IREvaluatorContext.cpp
 +++ b/KGEN/lib/Elaborator/IREvaluatorContext.cpp
 @@ -58,7 +58,8 @@ SymbolConstantAttr KGEN::extractSymbolConstantAttr(TypedAttr attr) {
@@ -4184,7 +4282,7 @@ index 3229d05f57e3bd233c7064977a3752a63e38db99..152c6f781d7166652bb567ef659fb234
    MLIRContext *ctx = compileOffloadClosureAttr.getContext();
    auto noneType = KGEN::NoneType::get(ctx);
 diff --git a/KGEN/lib/Elaborator/IREvaluatorContext.h b/KGEN/lib/Elaborator/IREvaluatorContext.h
-index 50e73571cc4a134cff1d24d2fe5a024b957fe4ce..4359a95347f6a601ff5067aeb304a5e309d25fae 100644
+index 50e73571cc..4359a95347 100644
 --- a/KGEN/lib/Elaborator/IREvaluatorContext.h
 +++ b/KGEN/lib/Elaborator/IREvaluatorContext.h
 @@ -303,10 +303,13 @@ struct OffloadFunc {
@@ -4205,7 +4303,7 @@ index 50e73571cc4a134cff1d24d2fe5a024b957fe4ce..4359a95347f6a601ff5067aeb304a5e3
  } // namespace M::KGEN
  
 diff --git a/KGEN/lib/Elaborator/ParametricElaborator.cpp b/KGEN/lib/Elaborator/ParametricElaborator.cpp
-index 21a4aed0bd627bf9881162022d3af99aa4fdb309..0d577f8e05cccca00e51da227b5021c81473052b 100644
+index 21a4aed0bd..0d577f8e05 100644
 --- a/KGEN/lib/Elaborator/ParametricElaborator.cpp
 +++ b/KGEN/lib/Elaborator/ParametricElaborator.cpp
 @@ -1889,6 +1889,60 @@ ParametricElaborator::bundleCompileOffloadOp(CompileOffloadOp op,
@@ -4336,7 +4434,7 @@ index 21a4aed0bd627bf9881162022d3af99aa4fdb309..0d577f8e05cccca00e51da227b5021c8
    values.push_back(numCapturesV);
    values.push_back(opaqueCaptureSizesV);
 diff --git a/KGEN/lib/KGENDialect/KGENAttrs.cpp b/KGEN/lib/KGENDialect/KGENAttrs.cpp
-index 538bce9fcf2e64f6bf38a30a1a1f4b725be91c5b..1a5b1a30f1c85b3126f1ef0d5e1f150176249724 100644
+index 538bce9fcf..1a5b1a30f1 100644
 --- a/KGEN/lib/KGENDialect/KGENAttrs.cpp
 +++ b/KGEN/lib/KGENDialect/KGENAttrs.cpp
 @@ -3733,8 +3733,9 @@ static Attribute simplifyTargetGetField(SmallVectorImpl<TypedAttr> &operands,
@@ -4362,7 +4460,7 @@ index 538bce9fcf2e64f6bf38a30a1a1f4b725be91c5b..1a5b1a30f1c85b3126f1ef0d5e1f1501
      return StringAttr::get(target.getTarget().getArch(), resultType);
    if (field.getValue() == "simd_bit_width")
 diff --git a/KGEN/lib/KGENDialect/KGENOps.cpp b/KGEN/lib/KGENDialect/KGENOps.cpp
-index 04037da59f86aa17132d73dd279a169f5cf20051..612a90777ca7ec28c5727e23e3c5ce91593ec652 100644
+index 04037da59f..612a90777c 100644
 --- a/KGEN/lib/KGENDialect/KGENOps.cpp
 +++ b/KGEN/lib/KGENDialect/KGENOps.cpp
 @@ -1742,13 +1742,16 @@ static ParseResult parseCompileOffloadOp(OpAsmParser &p, TypedAttr &targetType,
@@ -4404,7 +4502,7 @@ index 04037da59f86aa17132d73dd279a169f5cf20051..612a90777ca7ec28c5727e23e3c5ce91
  
  /// If 'value' is defined by one or more rebinds, look through them.
 diff --git a/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp b/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp
-index fa778b7a23765a08d4dfdd763ecbabec31c08114..92bb534fd8278fc3a994c76193348f0afb407361 100644
+index fa778b7a23..92bb534fd8 100644
 --- a/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp
 +++ b/KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp
 @@ -505,14 +505,27 @@ static LogicalResult convertLLVMMetadata(LLVM::LLVMFuncOp func, FuncType sig,
@@ -4452,7 +4550,7 @@ index fa778b7a23765a08d4dfdd763ecbabec31c08114..92bb534fd8278fc3a994c76193348f0a
    // Only apply result attributes for single-result functions, as multiple
    // KGEN results are packed into a single LLVM struct, and LLVM expects
 diff --git a/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp b/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
-index 71adc27134aa71af4991aa96ac22d7d0f0d9d568..e0376d34997cc373746b2bf97d9ad0776ef196c6 100644
+index 71adc27134..e0376d3499 100644
 --- a/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
 +++ b/KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp
 @@ -1221,7 +1221,7 @@ static SmallVector<Value> expandOperands(ConversionPatternRewriter &rewriter,
@@ -4619,7 +4717,7 @@ index 71adc27134aa71af4991aa96ac22d7d0f0d9d568..e0376d34997cc373746b2bf97d9ad077
        auto emptyAttrs = rewriter.getDictionaryAttr({});
 diff --git a/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp b/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..b8c1b4a4228c940be6bcd3cba3d3b99f34ff35b0
+index 0000000000..b8c1b4a422
 --- /dev/null
 +++ b/KGEN/lib/KGENToLLVM/Target/Metal/MetalLowering.cpp
 @@ -0,0 +1,147 @@
@@ -4771,7 +4869,7 @@ index 0000000000000000000000000000000000000000..b8c1b4a4228c940be6bcd3cba3d3b99f
 +} // namespace
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/MojoParser/ClosureEmitter.cpp b/KGEN/lib/MojoParser/ClosureEmitter.cpp
-index dad2e78a59714860e81da8fe16e23db38e4b7bdf..8768b76cb7ee5ae022388111fbd12e024ccd35f8 100644
+index dad2e78a59..8768b76cb7 100644
 --- a/KGEN/lib/MojoParser/ClosureEmitter.cpp
 +++ b/KGEN/lib/MojoParser/ClosureEmitter.cpp
 @@ -3572,22 +3572,28 @@ static bool canFunctionSignatureMatchTraitParamInf(FnOp actualFn,
@@ -5033,7 +5131,7 @@ index dad2e78a59714860e81da8fe16e23db38e4b7bdf..8768b76cb7ee5ae022388111fbd12e02
  
  LogicalResult ClosureEmitter::isTraitCompatibleWith(ASTType sourceTraitType,
 diff --git a/KGEN/lib/MojoParser/ClosureEmitter.h b/KGEN/lib/MojoParser/ClosureEmitter.h
-index c92f1e4a832737009a1ade1093a41b951a5cf810..c267bf084827417d920078051cbf3ac29e27bed3 100644
+index c92f1e4a83..c267bf0848 100644
 --- a/KGEN/lib/MojoParser/ClosureEmitter.h
 +++ b/KGEN/lib/MojoParser/ClosureEmitter.h
 @@ -184,7 +184,8 @@ private:
@@ -5065,7 +5163,7 @@ index c92f1e4a832737009a1ade1093a41b951a5cf810..c267bf084827417d920078051cbf3ac2
    /// Returns true if sourceTraitType can conform to targetTrait.
    LogicalResult isTraitCompatibleWith(ASTType sourceTraitType,
 diff --git a/KGEN/lib/MojoParser/ExprConversions.cpp b/KGEN/lib/MojoParser/ExprConversions.cpp
-index 3ab5dc7f5d4cbb781a558ab152ede3de7147f0f7..ec13e83bbeb8ea4bb49a39480a627f152e8ebbf7 100644
+index 3ab5dc7f5d..ec13e83bbe 100644
 --- a/KGEN/lib/MojoParser/ExprConversions.cpp
 +++ b/KGEN/lib/MojoParser/ExprConversions.cpp
 @@ -1715,8 +1715,8 @@ PValue IREmitter::bindNonStructTypeToTrait(ASTExprAnd<CValue> value,
@@ -5163,7 +5261,7 @@ index 3ab5dc7f5d4cbb781a558ab152ede3de7147f0f7..ec13e83bbeb8ea4bb49a39480a627f15
        }
  
 diff --git a/KGEN/lib/MojoParser/SpecializeInf.cpp b/KGEN/lib/MojoParser/SpecializeInf.cpp
-index 64589cef2fe4bd40c3ea986b9e5788c5d72070f5..8fd024ae701aa90618db99bb21a12805be2a8c39 100644
+index 64589cef2f..8fd024ae70 100644
 --- a/KGEN/lib/MojoParser/SpecializeInf.cpp
 +++ b/KGEN/lib/MojoParser/SpecializeInf.cpp
 @@ -162,6 +162,108 @@ FailureOr<SmallVector<TypedAttr>>
@@ -5276,7 +5374,7 @@ index 64589cef2fe4bd40c3ea986b9e5788c5d72070f5..8fd024ae701aa90618db99bb21a12805
    // actual returns in-register. Allow that convention size difference.
    bool targetHasExtraResultSlot =
 diff --git a/KGEN/lib/POPDialect/POPOpsFolders.cpp b/KGEN/lib/POPDialect/POPOpsFolders.cpp
-index 3da76ca2c10e59b5787f9e83285b01ed90462285..ba6a31bd9d9b6dbdba7c547aa7bb36dcaf473718 100644
+index 3da76ca2c1..ba6a31bd9d 100644
 --- a/KGEN/lib/POPDialect/POPOpsFolders.cpp
 +++ b/KGEN/lib/POPDialect/POPOpsFolders.cpp
 @@ -1472,6 +1472,14 @@ LogicalResult StoreOp::canonicalize(StoreOp op, PatternRewriter &b) {
@@ -5296,7 +5394,7 @@ index 3da76ca2c10e59b5787f9e83285b01ed90462285..ba6a31bd9d9b6dbdba7c547aa7bb36dc
    if (auto cst = dyn_cast_or_null<KGEN::ParamConstantOp>(
 diff --git a/KGEN/lib/Target/Metal/MetalTraits.cpp b/KGEN/lib/Target/Metal/MetalTraits.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..0a9817a3161f32603397380a88856d71b6fdd58b
+index 0000000000..0a9817a316
 --- /dev/null
 +++ b/KGEN/lib/Target/Metal/MetalTraits.cpp
 @@ -0,0 +1,50 @@
@@ -5352,7 +5450,7 @@ index 0000000000000000000000000000000000000000..0a9817a3161f32603397380a88856d71
 +} // namespace M::KGEN
 diff --git a/KGEN/lib/Target/Metal/MetalTraits.h b/KGEN/lib/Target/Metal/MetalTraits.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..d9806191e9f26da686b343d12128c1cd72dac3ec
+index 0000000000..d9806191e9
 --- /dev/null
 +++ b/KGEN/lib/Target/Metal/MetalTraits.h
 @@ -0,0 +1,42 @@
@@ -5399,7 +5497,7 @@ index 0000000000000000000000000000000000000000..d9806191e9f26da686b343d12128c1cd
 +
 +#endif // KGEN_TARGET_METAL_METALTRAITS_H
 diff --git a/KGEN/lib/Transforms/LowerAsyncFunctions.cpp b/KGEN/lib/Transforms/LowerAsyncFunctions.cpp
-index 15efcd2723d7d85739d498aa79939ab71dfbf91b..d26e818d2c0c0ba4117f20934d5c839ab94aaa45 100644
+index 15efcd2723..d26e818d2c 100644
 --- a/KGEN/lib/Transforms/LowerAsyncFunctions.cpp
 +++ b/KGEN/lib/Transforms/LowerAsyncFunctions.cpp
 @@ -1209,8 +1209,36 @@ void LowerAsyncBuildContext::insertFrameLoadsStores(
@@ -5460,8 +5558,63 @@ index 15efcd2723d7d85739d498aa79939ab71dfbf91b..d26e818d2c0c0ba4117f20934d5c839a
      image = existingImage->getSecond();
    } else {
      builder.setInsertionPoint(opWithUse);
+diff --git a/KGEN/test/kgen/object-compiler/metal-optimization-level.ll b/KGEN/test/kgen/object-compiler/metal-optimization-level.ll
+new file mode 100644
+index 0000000000..8482123ed2
+--- /dev/null
++++ b/KGEN/test/kgen/object-compiler/metal-optimization-level.ll
+@@ -0,0 +1,49 @@
++; RUN: kgen-llvm-opt -O0 -S %s | FileCheck %s --check-prefix=O0
++; RUN: kgen-llvm-opt -O3 -S %s | FileCheck %s --check-prefix=O3
++
++target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024-n8:16:32"
++target triple = "air64-apple-ios15.0"
++
++declare i32 @air.thread_position_in_threadgroup.x()
++
++define internal i32 @helper(i32 %value) {
++  %result = add i32 %value, 1
++  ret i32 %result
++}
++
++define void @kernel(ptr addrspace(1) %output) #0 {
++  %slot = alloca ptr addrspace(1), align 8
++  store ptr addrspace(1) %output, ptr %slot, align 8
++  %loaded = load ptr addrspace(1), ptr %slot, align 8
++  %result = call i32 @helper(i32 41)
++  store i32 %result, ptr addrspace(1) %loaded, align 4
++  ret void
++}
++
++define internal i32 @builtin_helper() {
++  %thread = call i32 @air.thread_position_in_threadgroup.x()
++  ret i32 %thread
++}
++
++define void @builtin_kernel(ptr addrspace(1) %output) #0 {
++  %thread = call i32 @builtin_helper()
++  store i32 %thread, ptr addrspace(1) %output, align 4
++  ret void
++}
++
++attributes #0 = { "metal.kernel" "kgen.offload.pointee_types"="simd:1:int32" }
++
++; O0: define internal i32 @helper
++; O0: %result = call i32 @helper(i32 41)
++; O0: store i32 %result, ptr addrspace(1) {{%.*}}
++; O0-NOT: define internal i32 @builtin_helper
++; O0-NOT: call i32 @air.thread_position_in_threadgroup.x
++; O0: define void @builtin_kernel(ptr addrspace(1){{.*}} %output, <3 x i32> %thread_position_in_threadgroup_idx)
++; O0: extractelement <3 x i32> %thread_position_in_threadgroup_idx, i32 0
++
++; O3-NOT: define internal i32 @helper
++; O3-NOT: call i32 @helper
++; O3: store i32 42, ptr addrspace(1) {{%.*}}
++; O3-NOT: define internal i32 @builtin_helper
++; O3-NOT: call i32 @air.thread_position_in_threadgroup.x
++; O3: define void @builtin_kernel(ptr addrspace(1){{.*}} %output, <3 x i32> %thread_position_in_threadgroup_idx)
 diff --git a/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir b/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
-index 223f1008e5c24800ab56659c65990ab8a8aa7374..bb5db721922704cf246a48aee78da61cb9700499 100644
+index 223f1008e5..bb5db72192 100644
 --- a/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
 +++ b/KGEN/test/kgen/pop-ir/pop-canonicalize.mlir
 @@ -2,6 +2,16 @@
@@ -5482,7 +5635,7 @@ index 223f1008e5c24800ab56659c65990ab8a8aa7374..bb5db721922704cf246a48aee78da61c
  kgen.func @neg() -> (!kgen.simd<2, si8>, !kgen.simd<2, f32>) {
    // CHECK-DAG: <1, -1>
 diff --git a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
-index c95a9bde40f5ae8d60802c86e03be458aec9c4b7..562e4ea3d70f22429f40f2502c7a30e1b2a29490 100644
+index c95a9bde40..562e4ea3d7 100644
 --- a/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
 +++ b/KGEN/test/kgen/pop-to-llvm/masked_intrinsics.mlir
 @@ -15,6 +15,66 @@ kgen.func @masked_load_with_alignment(
@@ -5559,7 +5712,7 @@ index c95a9bde40f5ae8d60802c86e03be458aec9c4b7..562e4ea3d70f22429f40f2502c7a30e1
 -
 diff --git a/KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo b/KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo
 new file mode 100644
-index 0000000000000000000000000000000000000000..445b94505cd1722a5e0d418ebe1e0568af1d024c
+index 0000000000..445b94505c
 --- /dev/null
 +++ b/KGEN/test/mojo-parser/closures/unified_closure_variadic_trait.mojo
 @@ -0,0 +1,34 @@
@@ -5598,7 +5751,7 @@ index 0000000000000000000000000000000000000000..445b94505cd1722a5e0d418ebe1e0568
 +
 +    accept_closure_pack(add_bias, Int32(5), Float32(2))
 diff --git a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl b/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
-index 1e3797a730c58267240443a22042020b054a40ec..b28bd1c860708182895fad81768c2b4181a29fe9 100644
+index 1e3797a730..b28bd1c860 100644
 --- a/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
 +++ b/bazel/internal/cc-toolchain/macos_sysroot_repository.bzl
 @@ -52,6 +52,7 @@ _INCLUDES = [
@@ -5610,7 +5763,7 @@ index 1e3797a730c58267240443a22042020b054a40ec..b28bd1c860708182895fad81768c2b41
      "System/Library/Frameworks/Security.framework/**",
      "System/Library/Frameworks/SystemConfiguration.framework/**",
 diff --git a/max/mojo/max/gpu/host/_device_context_extras.mojo b/max/mojo/max/gpu/host/_device_context_extras.mojo
-index 0d010d7e4d9c2273b96aebc320731852b4d13531..8d2c3979ba8e8e1386b60f6c73b430753ab5a90c 100644
+index 0d010d7e4d..8d2c3979ba 100644
 --- a/max/mojo/max/gpu/host/_device_context_extras.mojo
 +++ b/max/mojo/max/gpu/host/_device_context_extras.mojo
 @@ -165,6 +165,7 @@ __extension DeviceFunction:
@@ -5632,7 +5785,7 @@ index 0d010d7e4d9c2273b96aebc320731852b4d13531..8d2c3979ba8e8e1386b60f6c73b43075
              )
  
 diff --git a/max/mojo/max/gpu/host/_device_context_metal.mojo b/max/mojo/max/gpu/host/_device_context_metal.mojo
-index 103beda3007d647c7c09c7abf3cf06d043bb5e0b..0dc9d4911d42d9a55910de514759f10f9351d489 100644
+index 103beda300..0dc9d4911d 100644
 --- a/max/mojo/max/gpu/host/_device_context_metal.mojo
 +++ b/max/mojo/max/gpu/host/_device_context_metal.mojo
 @@ -54,7 +54,14 @@ struct MetalEnqueueFunctionArgs:
@@ -5836,7 +5989,7 @@ index 103beda3007d647c7c09c7abf3cf06d043bb5e0b..0dc9d4911d42d9a55910de514759f10f
  
      var metal_args_addrs = unsafe_stack_allocation[
 diff --git a/max/mojo/max/gpu/host/compile.mojo b/max/mojo/max/gpu/host/compile.mojo
-index f349463fbc2cfc3aaedd2cb91365367485e4e0ea..f64813b58c918bd360088b7881d9c24de20885a7 100644
+index f349463fbc..f64813b58c 100644
 --- a/max/mojo/max/gpu/host/compile.mojo
 +++ b/max/mojo/max/gpu/host/compile.mojo
 @@ -45,12 +45,16 @@ def _compile_code[
@@ -5857,7 +6010,7 @@ index f349463fbc2cfc3aaedd2cb91365367485e4e0ea..f64813b58c918bd360088b7881d9c24d
      ]()
  
 diff --git a/max/mojo/max/gpu/host/device_context.mojo b/max/mojo/max/gpu/host/device_context.mojo
-index cc56890d81b698f0c3a15e114cee9db92f5ba8f5..3c360f02aa1811468b24528fcb34f6b139a606dd 100644
+index cc56890d81..3c360f02aa 100644
 --- a/max/mojo/max/gpu/host/device_context.mojo
 +++ b/max/mojo/max/gpu/host/device_context.mojo
 @@ -161,6 +161,25 @@ struct _LaunchBits[size: Int, alignment: Int](
@@ -6244,7 +6397,7 @@ index cc56890d81b698f0c3a15e114cee9db92f5ba8f5..3c360f02aa1811468b24528fcb34f6b1
      def enqueue_function[
          FuncType: RegisterPassable & def() -> None,
 diff --git a/max/mojo/max/runtime/tracing.mojo b/max/mojo/max/runtime/tracing.mojo
-index 6585ac129a94ac69292de0b220d087702e08d244..b44039f100589ac0a9e5c6b08505abbeeca3f4bb 100644
+index 6585ac129a..b44039f100 100644
 --- a/max/mojo/max/runtime/tracing.mojo
 +++ b/max/mojo/max/runtime/tracing.mojo
 @@ -18,6 +18,7 @@ from std.collections.optional import Optional, OptionalReg
@@ -6293,7 +6446,7 @@ index 6585ac129a94ac69292de0b220d087702e08d244..b44039f100589ac0a9e5c6b08505abbe
              "KGEN_CompilerRT_TimeTraceProfilerGetCurrentId", Int
          ]()
 diff --git a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo b/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
-index 443bc55bd8b355ff666f2d2370678f77e8164f42..2f7941fc82f17b3e92d26484b5901f0ddf3339eb 100644
+index 443bc55bd8..2f7941fc82 100644
 --- a/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
 +++ b/max/mojo/test/gpu/host/test_metal_device_type_encoder.mojo
 @@ -37,8 +37,8 @@ from max.gpu.host._device_context_metal import MetalDeviceTypeEncoder
@@ -6354,7 +6507,7 @@ index 443bc55bd8b355ff666f2d2370678f77e8164f42..2f7941fc82f17b3e92d26484b5901f0d
      var handle_a = a._handle.value()
      var handle_b = b._handle.value()
 diff --git a/mojo/stdlib/std/compile/compile.mojo b/mojo/stdlib/std/compile/compile.mojo
-index 51520054b516d19cf93186168eadc682969e7d21..4e962a37d1087dbce2133cb45f4c1eca56367752 100644
+index 51520054b5..4e962a37d1 100644
 --- a/mojo/stdlib/std/compile/compile.mojo
 +++ b/mojo/stdlib/std/compile/compile.mojo
 @@ -43,8 +43,6 @@ from std.os import PathLike
@@ -6416,7 +6569,7 @@ index 51520054b516d19cf93186168eadc682969e7d21..4e962a37d1087dbce2133cb45f4c1eca
          num_captures=Int(SIMDLength(mlir_value=offload.num_captures)),
          capture_sizes=offload.capture_sizes,
 diff --git a/mojo/stdlib/std/ffi/__init__.mojo b/mojo/stdlib/std/ffi/__init__.mojo
-index ed6c8f8515f5cf564f169629107c7ea6d5f78d74..75be889afa62c8d4d3461d8a76740855656c5356 100644
+index ed6c8f8515..75be889afa 100644
 --- a/mojo/stdlib/std/ffi/__init__.mojo
 +++ b/mojo/stdlib/std/ffi/__init__.mojo
 @@ -135,7 +135,7 @@ comptime MAX_PATH = _get_max_path()
@@ -6450,7 +6603,7 @@ index ed6c8f8515f5cf564f169629107c7ea6d5f78d74..75be889afa62c8d4d3461d8a76740855
          if not handle:
              var error_message = dlerror()
 diff --git a/mojo/stdlib/std/gpu/host/info.mojo b/mojo/stdlib/std/gpu/host/info.mojo
-index b50f9979708918e4cdecf692aaec6fe7597d080f..2e65abf39cf4d1039558363a4ed19476642bc9c2 100644
+index b50f997970..2e65abf39c 100644
 --- a/mojo/stdlib/std/gpu/host/info.mojo
 +++ b/mojo/stdlib/std/gpu/host/info.mojo
 @@ -271,6 +271,22 @@ def _get_metal_m1_target() -> _TargetType:
@@ -6704,7 +6857,7 @@ index b50f9979708918e4cdecf692aaec6fe7597d080f..2e65abf39cf4d1039558363a4ed19476
      elif target_arch == "cuda":
          return _get_info_from_target[_accelerator_arch()]()
 diff --git a/mojo/stdlib/std/io/file.mojo b/mojo/stdlib/std/io/file.mojo
-index 65235212ef1cdce2a33a194cb5f6b662242c2ed4..c05c31ef8b40c66e27863b1e37f22bc0e7d74e05 100644
+index 65235212ef..c05c31ef8b 100644
 --- a/mojo/stdlib/std/io/file.mojo
 +++ b/mojo/stdlib/std/io/file.mojo
 @@ -55,19 +55,19 @@ comptime O_RDWR = 0x0002
@@ -6732,7 +6885,7 @@ index 65235212ef1cdce2a33a194cb5f6b662242c2ed4..c05c31ef8b40c66e27863b1e37f22bc0
  """Close file descriptor on exec."""
  
 diff --git a/mojo/stdlib/std/io/file_descriptor.mojo b/mojo/stdlib/std/io/file_descriptor.mojo
-index 6e39f2d288731b19b25bb74cadabf266d33ed4be..ee127fd263f33e7b8be5ea040609651f56b5a385 100644
+index 6e39f2d288..ee127fd263 100644
 --- a/mojo/stdlib/std/io/file_descriptor.mojo
 +++ b/mojo/stdlib/std/io/file_descriptor.mojo
 @@ -112,7 +112,7 @@ struct FileDescriptor(TrivialRegisterPassable, Writer):
@@ -6749,7 +6902,7 @@ similarity index 100%
 rename from mojo/stdlib/std/os/_macos.mojo
 rename to mojo/stdlib/std/os/_darwin.mojo
 diff --git a/mojo/stdlib/std/os/fstat.mojo b/mojo/stdlib/std/os/fstat.mojo
-index eb6d1b6c8bc68c6fcdb71c22a9579d69b6b81594..e17071a65cc9d92763618767b20a925e51cac028 100644
+index eb6d1b6c8b..e17071a65c 100644
 --- a/mojo/stdlib/std/os/fstat.mojo
 +++ b/mojo/stdlib/std/os/fstat.mojo
 @@ -27,8 +27,8 @@ from ._linux_aarch64 import _lstat as _lstat_linux_arm
@@ -6799,7 +6952,7 @@ index eb6d1b6c8bc68c6fcdb71c22a9579d69b6b81594..e17071a65cc9d92763618767b20a925e
 +    else:
 +        CompilationTarget.unsupported_target_error[operation="std.os.lstat"]()
 diff --git a/mojo/stdlib/std/os/os.mojo b/mojo/stdlib/std/os/os.mojo
-index 434476791a00b266b9abd4e7e824e9a6ce10530c..94f19d825c77714c0270eb655eb360fe99317520 100644
+index 434476791a..94f19d825c 100644
 --- a/mojo/stdlib/std/os/os.mojo
 +++ b/mojo/stdlib/std/os/os.mojo
 @@ -70,7 +70,7 @@ struct _dirent_linux(Copyable):
@@ -6853,7 +7006,7 @@ index 434476791a00b266b9abd4e7e824e9a6ce10530c..94f19d825c77714c0270eb655eb360fe
                  )
              )
 diff --git a/mojo/stdlib/std/os/path/path.mojo b/mojo/stdlib/std/os/path/path.mojo
-index 70bd16b198a8404bfe3dd793dc39aff60036c933..8951ead3ee23304f5ae0ce707292bf09e2857863 100644
+index 70bd16b198..8951ead3ee 100644
 --- a/mojo/stdlib/std/os/path/path.mojo
 +++ b/mojo/stdlib/std/os/path/path.mojo
 @@ -32,8 +32,8 @@ from .._linux_aarch64 import _lstat as _lstat_linux_arm
@@ -6910,7 +7063,7 @@ diff --git a/mojo/stdlib/std/pwd/_macos.mojo b/mojo/stdlib/std/pwd/_darwin.mojo
 similarity index 95%
 rename from mojo/stdlib/std/pwd/_macos.mojo
 rename to mojo/stdlib/std/pwd/_darwin.mojo
-index 4401bc80f13ba7c5835517560d5ee5510065d354..66b78dc96000c046a94ae47ca852049f0e45c327 100644
+index 4401bc80f1..66b78dc960 100644
 --- a/mojo/stdlib/std/pwd/_macos.mojo
 +++ b/mojo/stdlib/std/pwd/_darwin.mojo
 @@ -48,7 +48,7 @@ def _build_pw_struct(passwd_ptr: ImmPointer[_C_Passwd, _]) -> Passwd:
@@ -6932,7 +7085,7 @@ index 4401bc80f13ba7c5835517560d5ee5510065d354..66b78dc96000c046a94ae47ca852049f
          "getpwnam", OptionalPointer[_C_Passwd, UntrackedOrigin[mut=True]]
      ](name.as_c_string_slice())
 diff --git a/mojo/stdlib/std/pwd/pwd.mojo b/mojo/stdlib/std/pwd/pwd.mojo
-index 49712397d170767c44e75a08d790f1a71c2f5097..ab5911f495c68cb88998086a84619559773c0e70 100644
+index 49712397d1..ab5911f495 100644
 --- a/mojo/stdlib/std/pwd/pwd.mojo
 +++ b/mojo/stdlib/std/pwd/pwd.mojo
 @@ -18,7 +18,7 @@ user ID or username, returning structured account information including home
@@ -6993,7 +7146,7 @@ index 49712397d170767c44e75a08d790f1a71c2f5097..ab5911f495c68cb88998086a84619559
 +    else:
 +        CompilationTarget.unsupported_target_error[operation="std.pwd.getpwnam"]()
 diff --git a/mojo/stdlib/std/python/_cpython.mojo b/mojo/stdlib/std/python/_cpython.mojo
-index 4c2c76da9ba0b8185dcd18512ce09d48e7595407..9efb01bd2ab2c3d30ddc0d73108c1f97972cc641 100644
+index 4c2c76da9b..9efb01bd2a 100644
 --- a/mojo/stdlib/std/python/_cpython.mojo
 +++ b/mojo/stdlib/std/python/_cpython.mojo
 @@ -27,6 +27,7 @@ from std.os import abort, getenv, setenv
@@ -7017,7 +7170,7 @@ index 4c2c76da9ba0b8185dcd18512ce09d48e7595407..9efb01bd2ab2c3d30ddc0d73108c1f97
          var file_dir = dirname(argv()[0])
          if Path(file_dir).is_dir() or file_dir == "":
 diff --git a/mojo/stdlib/std/subprocess/subprocess.mojo b/mojo/stdlib/std/subprocess/subprocess.mojo
-index 4c456ce35250246308627e45216a6a1d3417b789..0b6bf414a0abfd25458e3b9a211378cd48f5015d 100644
+index 4c456ce352..0b6bf414a0 100644
 --- a/mojo/stdlib/std/subprocess/subprocess.mojo
 +++ b/mojo/stdlib/std/subprocess/subprocess.mojo
 @@ -107,5 +107,10 @@ def run(cmd: String) raises -> String:
@@ -7032,7 +7185,7 @@ index 4c456ce35250246308627e45216a6a1d3417b789..0b6bf414a0abfd25458e3b9a211378cd
      var hdl = _POpenHandle(cmd)
      return hdl.read()
 diff --git a/mojo/stdlib/std/sys/_libc_errno.mojo b/mojo/stdlib/std/sys/_libc_errno.mojo
-index 80f7faad24d071b64f9fcff8f5e35bbb889e1a0f..6eeb0b7ac87537f7db04a1c15ba9fe5aa077678b 100644
+index 80f7faad24..6eeb0b7ac8 100644
 --- a/mojo/stdlib/std/sys/_libc_errno.mojo
 +++ b/mojo/stdlib/std/sys/_libc_errno.mojo
 @@ -18,7 +18,7 @@ from std.sys.info import CompilationTarget, platform_map
@@ -7348,7 +7501,7 @@ index 80f7faad24d071b64f9fcff8f5e35bbb889e1a0f..6eeb0b7ac87537f7db04a1c15ba9fe5a
              self.value
          )
 diff --git a/mojo/stdlib/std/sys/info.mojo b/mojo/stdlib/std/sys/info.mojo
-index 132e3af2f21a2d42a3611c9a4d53ff45fcecaa28..faa9e6da8d4de079b32eb9e608f7b8ec1d4e6f8a 100644
+index 132e3af2f2..faa9e6da8d 100644
 --- a/mojo/stdlib/std/sys/info.mojo
 +++ b/mojo/stdlib/std/sys/info.mojo
 @@ -189,6 +189,26 @@ struct CompilationTarget[value: _TargetType = _current_target()](
@@ -7470,7 +7623,7 @@ index 132e3af2f21a2d42a3611c9a4d53ff45fcecaa28..faa9e6da8d4de079b32eb9e608f7b8ec
      return is_apple_gpu() and CompilationTarget._is_arch[subarch]()
  
 diff --git a/mojo/stdlib/std/time/time.mojo b/mojo/stdlib/std/time/time.mojo
-index dcb8370f589a0013079c1cea76b3d912df4404f4..d7c3bb3264ec315189d0ed062633576461f16afc 100644
+index dcb8370f58..d7c3bb3264 100644
 --- a/mojo/stdlib/std/time/time.mojo
 +++ b/mojo/stdlib/std/time/time.mojo
 @@ -62,8 +62,12 @@ struct _CTimeSpec(Defaultable, TrivialRegisterPassable, Writable):
@@ -7502,7 +7655,7 @@ index dcb8370f589a0013079c1cea76b3d912df4404f4..d7c3bb3264ec315189d0ed0626335764
  
  @always_inline
 diff --git a/mojo/stdlib/test/compile/test_compile.mojo b/mojo/stdlib/test/compile/test_compile.mojo
-index f4a5466ab921136489b0f65d8aaf45f29504d240..fce78cfb8e835c24543c673c45441c59fe381867 100644
+index f4a5466ab9..fce78cfb8e 100644
 --- a/mojo/stdlib/test/compile/test_compile.mojo
 +++ b/mojo/stdlib/test/compile/test_compile.mojo
 @@ -17,6 +17,10 @@ from std.testing import TestSuite

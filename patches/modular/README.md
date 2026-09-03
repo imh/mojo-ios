@@ -8,6 +8,9 @@ It adds explicit iOS/Darwin stdlib policy, dependency-light Apple embedded
 CompilerRT/AsyncRT targets, Apple AIR/Metal lowering, generic unified-closure
 offload fixes, generic packed masked-intrinsic operand lowering, and the
 ordinary MAX Metal DeviceContext ABI.
+The Metal backend honors true O0 separately from required AIR legalization,
+preserves line-table debug information, and rejects unsupported full debug by
+name before invoking Apple tools.
 
 Application Mojo continues to use standard APIs. Verified Darwin ABI sharing
 is named explicitly; unimplemented target-known operations use

@@ -27,6 +27,7 @@ METAL_SEMANTIC_SYMBOLS = {
     "AsyncRT_DeviceContext_loadFunction",
     "AsyncRT_DeviceFunction_release",
     "AsyncRT_DeviceFunction_retain",
+    "AsyncRT_DeviceFunction_copyToConstantMemory",
 }
 
 
